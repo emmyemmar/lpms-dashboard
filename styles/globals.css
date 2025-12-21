@@ -1,0 +1,17 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background-color: #0b1220;
+  color: #e5e7eb;
+}
+
+h1, h2, h3 {
+  color: #e5e7eb;
+}
+
+.card {
+  background: #111827;
+  border-radius: 14px;
+  padding: 20px;
+  border: 1px solid #1f2937;
+}
