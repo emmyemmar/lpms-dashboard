@@ -1,5 +1,14 @@
 // components/PoolCard.jsx
-export default function PoolCard({ name, deposit, liquidation, profitability, apy, isTop }) {
+import InfoTooltip from "./InfoTooltip";
+
+export default function PoolCard({
+  name,
+  deposit,
+  liquidation,
+  profitability,
+  apy,
+  isTop,
+}) {
   return (
     <div
       className="card"
@@ -13,18 +22,23 @@ export default function PoolCard({ name, deposit, liquidation, profitability, ap
       </h3>
 
       <p>
-        <strong>BOLD Deposited:</strong><br />
+        <strong>BOLD Deposited:</strong>
+        <br />
         {deposit.toLocaleString()} BOLD
       </p>
 
       <p>
-        <strong>Liquidated Collateral (USD):</strong><br />
-        ${liquidation.toLocaleString()}
+        <strong>Liquidated Collateral (USD):</strong>
+        <br />${liquidation.toLocaleString()}
       </p>
 
       {/* Profitability Section */}
       <div style={{ marginTop: "14px" }}>
-        <strong>Profitability</strong>
+        <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          Profitability
+          <InfoTooltip learnMoreUrl="https://docs.liquity.org" />
+        </strong>
+
         <div
           style={{
             marginTop: "6px",
@@ -43,12 +57,16 @@ export default function PoolCard({ name, deposit, liquidation, profitability, ap
             }}
           />
         </div>
-        <small style={{ color: "#9ca3af" }}>{profitability.toFixed(2)}%</small>
+
+        <small style={{ color: "#9ca3af" }}>
+          {profitability.toFixed(2)}%
+        </small>
       </div>
 
       {/* Average APY Section */}
       <div style={{ marginTop: "14px" }}>
         <strong>Average APY</strong>
+
         <div
           style={{
             marginTop: "6px",
@@ -67,6 +85,7 @@ export default function PoolCard({ name, deposit, liquidation, profitability, ap
             }}
           />
         </div>
+
         <small style={{ color: "#9ca3af" }}>{apy}%</small>
       </div>
     </div>

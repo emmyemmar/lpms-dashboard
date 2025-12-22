@@ -3,7 +3,7 @@
 import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
-import Footer from "../../components/Footer"; // Footer component
+import Footer from "../../components/Footer";
 
 import { fetchBoldDeposit } from "../../lib/dune/fetchBoldDeposit";
 import { fetchLiquidations } from "../../lib/dune/fetchLiquidations";
@@ -18,6 +18,9 @@ export default async function DashboardPage() {
 
   // ===== Trove data (cached 24h) =====
   const allTroves = await fetchAllTroves();
+
+  // Timestamp (server-rendered)
+  const lastUpdated = new Date().toUTCString();
 
   const collaterals = Array.from(
     new Set([
@@ -53,7 +56,7 @@ export default async function DashboardPage() {
           top: 0,
           backgroundColor: "#0b1220",
           zIndex: 1000,
-          padding: "12px 24px",           // smaller padding
+          padding: "12px 24px",
           borderBottom: "1px solid #1f2937",
           display: "flex",
           alignItems: "center",
@@ -61,10 +64,10 @@ export default async function DashboardPage() {
       >
         <a href="/dashboard" style={{ display: "flex", alignItems: "center" }}>
           <Image
-            src="/Logo.png"       // capital L
+            src="/Logo.png"
             alt="Liquity BOLD"
-            width={26}            // smaller width
-            height={26}           // proportional height
+            width={26}
+            height={26}
             priority
           />
         </a>
@@ -76,8 +79,13 @@ export default async function DashboardPage() {
 
       {/* ================= MAIN ================= */}
       <main style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}>
-        <p style={{ color: "#9ca3af", marginTop: "6px" }}>
-           🔥<strong>Recommended Stability Pool:</strong>{" "}
+        {/* Last updated */}
+        <p style={{ color: "#6b7280", fontSize: "12px" }}>
+          Last updated: {lastUpdated}
+        </p>
+
+        <p style={{ color: "#9ca3af", marginTop: "14px" }}>
+          🔥 <strong>Recommended Stability Pool:</strong>{" "}
           <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
@@ -115,7 +123,7 @@ export default async function DashboardPage() {
       </main>
 
       {/* ================= FOOTER ================= */}
-      <Footer />  {/* Footer component with clickable links */}
+      <Footer />
     </>
   );
 }
