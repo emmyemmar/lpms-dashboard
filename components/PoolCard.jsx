@@ -1,4 +1,5 @@
 // components/PoolCard.jsx
+import Image from "next/image";
 import InfoTooltip from "./InfoTooltip";
 
 export default function PoolCard({
@@ -15,11 +16,24 @@ export default function PoolCard({
       style={{
         border: isTop ? "2px solid #4ade80" : "1px solid #1f2937",
         boxShadow: isTop ? "0 0 12px rgba(74, 222, 128, 0.4)" : "none",
+        padding: "16px",
+        borderRadius: "12px",
+        backgroundColor: "#0b1220",
       }}
     >
-      <h3 style={{ color: "#4ade80" }}>
-        {name} {isTop && "🔥"}
-      </h3>
+      {/* Token Logo + Name */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+        <Image
+          src={`/tokens/${name}.png`} // Logo filename must match collateral name
+          alt={name}
+          width={24}
+          height={24}
+          priority
+        />
+        <h3 style={{ color: "#4ade80", margin: 0 }}>
+          {name} {isTop && "🔥"}
+        </h3>
+      </div>
 
       <p>
         <strong>BOLD Deposited:</strong>
