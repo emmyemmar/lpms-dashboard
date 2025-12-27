@@ -1,10 +1,6 @@
-<<<<<<< HEAD
 // components/PoolCard.jsx
 "use client";
-=======
-"use client";
 
->>>>>>> 40ffa32 (Add risk summary PoolCard, CR & redemption risk, and stress test slider)
 import Image from "next/image";
 import { useState } from "react";
 import InfoTooltip from "./InfoTooltip";
@@ -16,44 +12,76 @@ export default function PoolCard({
   profitability,
   apy,
   isTop,
-  crRisk = 0,               // optional: percentage of low CR troves
-  redemptionRisk = "Minimal", // optional: "High", "Moderate", "Minimal"
+  crRisk = 0,              // percentage of troves under low CR
+  redemptionRisk = "Minimal", // "High", "Moderate", "Minimal"
+  collateralAmount = 0,
 }) {
-  // Slider state for stress test
+  // Slider state for price drop stress test
   const [priceDrop, setPriceDrop] = useState(0);
 
-  // Calculate collateral liquidation for stress test
-  const stressLiquidation = (liquidation * priceDrop) / 100;
+  // Determine color for stress test based on price drop
+  const stressColor =
+    priceDrop >= 50 ? "#f87171" : priceDrop >= 25 ? "#facc15" : "#4ade80";
 
-  // Determine slider color based on risk
-  let sliderColor = "#4ade80"; // green low risk
-  if (priceDrop >= 20) sliderColor = "#facc15"; // yellow
-  if (priceDrop >= 40) sliderColor = "#f87171"; // red
+  // Top Risk Summary card colors
+  const topCardColors = {
+    wstETH: "#1C1D4F",
+    WETH: "#63D77D",
+    rETH: "#F1C91E",
+  };
 
   return (
     <div
-      className="card"
       style={{
-        border: isTop ? "2px solid #4ade80" : "1px solid #1f2937",
-        boxShadow: isTop ? "0 0 12px rgba(74, 222, 128, 0.4)" : "none",
-        padding: "16px",
-        borderRadius: "12px",
-        backgroundColor: "#0b1220",
-        marginBottom: "16px",
+        marginBottom: "24px",
       }}
     >
-      {/* === Token Logo + Name + CR & Redemption Risk === */}
+      {/* ===== Risk Summary Top Card ===== */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          backgroundColor: topCardColors[name] || "#1f2937",
+          padding: "12px",
+          borderRadius: "12px",
+          color: "#fff",
           marginBottom: "8px",
+          transition: "transform 0.2s",
+        }}
+        className="hover:scale-[1.02]"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <strong>{name} Risk Summary</strong>
+          <span>{redemptionRisk} Redemption Risk</span>
+        </div>
+        <div style={{ marginTop: "6px" }}>
+          <small>
+            {crRisk.toFixed(2)}% of troves under low CR, collateral sum:{" "}
+            {collateralAmount.toLocaleString()}
+          </small>
+        </div>
+      </div>
+
+      {/* ===== Existing Pool Card ===== */}
+      <div
+        className="card"
+        style={{
+          border: isTop ? "2px solid #4ade80" : "1px solid #1f2937",
+          boxShadow: isTop ? "0 0 12px rgba(74, 222, 128, 0.4)" : "none",
+          padding: "16px",
+          borderRadius: "12px",
+          backgroundColor: "#0b1220",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {/* Token Logo + Name */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginBottom: "8px",
+          }}
+        >
           <Image
-            src={`/tokens/${name}.png`}
+            src={`/tokens/${name}.png`} // Logo filename must match collateral name
             alt={name}
             width={24}
             height={24}
@@ -64,94 +92,99 @@ export default function PoolCard({
           </h3>
         </div>
 
-        <div style={{ fontSize: "12px", color: "#facc15" }}>
-          CR Risk: {crRisk.toFixed(0)}% | Redemption Risk: {redemptionRisk}
-        </div>
-      </div>
+        <p>
+          <strong>BOLD Deposited:</strong>
+          <br />
+          {deposit.toLocaleString()} BOLD
+        </p>
 
-      {/* BOLD Deposited */}
-      <p>
-        <strong>BOLD Deposited:</strong>
-        <br />
-        {deposit.toLocaleString()} BOLD
-      </p>
+        <p>
+          <strong>Liquidated Collateral (USD):</strong>
+          <br />${liquidation.toLocaleString()}
+        </p>
 
-      {/* Liquidated Collateral */}
-      <p>
-        <strong>Liquidated Collateral (USD):</strong>
-        <br />${liquidation.toLocaleString()}
-      </p>
+        {/* Profitability Section */}
+        <div style={{ marginTop: "14px" }}>
+          <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            Profitability
+            <InfoTooltip learnMoreUrl="https://docs.liquity.org" />
+          </strong>
 
-      {/* Profitability Section */}
-      <div style={{ marginTop: "14px" }}>
-        <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          Profitability
-          <InfoTooltip learnMoreUrl="https://docs.liquity.org" />
-        </strong>
-
-        <div
-          style={{
-            marginTop: "6px",
-            background: "#1f2937",
-            borderRadius: "10px",
-            height: "14px",
-            overflow: "hidden",
-          }}
-        >
           <div
             style={{
-              width: `${Math.min(profitability, 100)}%`,
-              height: "100%",
-              background: isTop ? "#22c55e" : "#4ade80",
-              transition: "width 0.4s ease",
+              marginTop: "6px",
+              background: "#1f2937",
+              borderRadius: "10px",
+              height: "14px",
+              overflow: "hidden",
             }}
-          />
+          >
+            <div
+              style={{
+                width: `${Math.min(profitability, 100)}%`,
+                height: "100%",
+                background: isTop ? "#22c55e" : "#4ade80",
+                transition: "width 0.4s ease",
+              }}
+            />
+          </div>
+
+          <small style={{ color: "#9ca3af" }}>{profitability.toFixed(2)}%</small>
         </div>
 
-        <small style={{ color: "#9ca3af" }}>{profitability.toFixed(2)}%</small>
-      </div>
+        {/* Average APY Section */}
+        <div style={{ marginTop: "14px" }}>
+          <strong>Average APY</strong>
 
-      {/* Average APY Section */}
-      <div style={{ marginTop: "14px" }}>
-        <strong>Average APY</strong>
-        <div
-          style={{
-            marginTop: "6px",
-            background: "#1f2937",
-            borderRadius: "10px",
-            height: "14px",
-            overflow: "hidden",
-          }}
-        >
           <div
             style={{
-              width: `${Math.min(apy, 100)}%`,
-              height: "100%",
-              background: "#3b82f6",
-              transition: "width 0.4s ease",
+              marginTop: "6px",
+              background: "#1f2937",
+              borderRadius: "10px",
+              height: "14px",
+              overflow: "hidden",
             }}
-          />
+          >
+            <div
+              style={{
+                width: `${Math.min(apy, 100)}%`,
+                height: "100%",
+                background: "#3b82f6", // Blue
+                transition: "width 0.4s ease",
+              }}
+            />
+          </div>
+
+          <small style={{ color: "#9ca3af" }}>{apy}%</small>
         </div>
-        <small style={{ color: "#9ca3af" }}>{apy}%</small>
       </div>
 
-      {/* Stress Test Slider */}
-      <div style={{ marginTop: "14px" }}>
-        <label style={{ fontSize: "12px" }}>Price Drop Stress Test: {priceDrop}%</label>
+      {/* ===== Stress Test Slider ===== */}
+      <div
+        style={{
+          marginTop: "12px",
+          padding: "12px",
+          backgroundColor: "#1f2937",
+          borderRadius: "12px",
+        }}
+      >
+        <label style={{ display: "block", marginBottom: "6px" }}>
+          Price Drop Stress Test (%)
+        </label>
         <input
           type="range"
-          min="0"
-          max="100"
+          min={0}
+          max={100}
           value={priceDrop}
           onChange={(e) => setPriceDrop(Number(e.target.value))}
           style={{
             width: "100%",
-            accentColor: sliderColor,
-            marginTop: "4px",
+            accentColor: stressColor,
           }}
         />
-        <small style={{ color: "#9ca3af" }}>
-          Collateral at risk: ${stressLiquidation.toLocaleString()}
+        <small style={{ color: stressColor }}>
+          {priceDrop}% price drop → estimated liquidated collateral: $
+          {(liquidation * (priceDrop / 100)).toLocaleString()}
         </small>
       </div>
     </div>
