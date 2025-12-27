@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import InfoTooltip from "./InfoTooltip";
 
 export default function PoolCard({
@@ -10,49 +10,31 @@ export default function PoolCard({
   liquidation = 0,
   apy = 0,
   isTop = false,
-
-  // ===== Risk summary =====
-  crRisk = 0,                 // % of troves under low CR
-  redemptionRisk = "Minimal",
-  collateralAmount = 0,       // total low-CR collateral (from dashboard)
-
-  // ===== Profitability =====
-  profitabilityRatio = 0,     // 0–1 (relative, NOT percentage)
-
-  // ===== Stress test =====
-  allTroves = [],
+  crRisk = 0,                  // % of troves under low CR
+  redemptionRisk = "Minimal", 
+  lowCRTroves = [],            // List of troves under low CR
+  totalCollateral = 0,         // Total collateral for this type
+  minCRRequirement = 1.1,      // Required minimum CR
+  profitability = 0,           // ratio 0-1
 }) {
   const [priceDrop, setPriceDrop] = useState(0);
 
-  // ================= FILTER TROVES BY COLLATERAL =================
-  const collateralTroves = useMemo(
-    () => allTroves.filter((t) => t.collateralType === name),
-    [allTroves, name]
-  );
+  // ===== Stress test calculation =====
+  const liquidatedCollateral = lowCRTroves
+    .filter((t) => t.cr * (1 - priceDrop / 100) < minCRRequirement)
+    .reduce((sum, t) => sum + (t.collateralAmount || 0), 0);
 
-  // ================= STRESS TEST CALCULATION =================
-  const liquidatedCollateral = useMemo(() => {
-    return collateralTroves
-      .filter((t) => {
-        const stressedCR = Number(t.cr) * (1 - priceDrop / 100);
-        return stressedCR < Number(t.requiredCR);
-      })
-      .reduce((sum, t) => sum + Number(t.collateralAmount || 0), 0);
-  }, [collateralTroves, priceDrop]);
-
-  const stressRatio =
-    collateralAmount > 0
-      ? liquidatedCollateral / collateralAmount
-      : 0;
+  const stressBarWidth = totalCollateral
+    ? (liquidatedCollateral / totalCollateral) * 100
+    : 0;
 
   const stressColor =
-    stressRatio > 0.5
-      ? "#f87171"
-      : stressRatio > 0.25
-      ? "#facc15"
-      : "#4ade80";
+    stressBarWidth > 50
+      ? "#f87171" // red
+      : stressBarWidth > 25
+      ? "#facc15" // yellow
+      : "#4ade80"; // green
 
-  // ================= UI COLORS =================
   const topCardColors = {
     wstETH: "#1C1D4F",
     WETH: "#63D77D",
@@ -60,81 +42,80 @@ export default function PoolCard({
   };
 
   return (
-    <div style={{ marginBottom: "24px" }}>
-      {/* ================= RISK SUMMARY ================= */}
+    <div style={{ marginBottom: 24 }}>
+      {/* Risk Summary */}
       <div
         style={{
           backgroundColor: topCardColors[name] || "#1f2937",
-          padding: "12px",
-          borderRadius: "12px",
+          padding: 12,
+          borderRadius: 12,
           color: "#fff",
-          marginBottom: "8px",
+          marginBottom: 8,
+          transition: "transform 0.2s",
         }}
+        className="hover:scale-[1.02]"
       >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <strong>{name} Risk Summary</strong>
           <span>{redemptionRisk} Redemption Risk</span>
         </div>
-
-        <div style={{ marginTop: "6px" }}>
+        <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(2)}% of troves under low CR · Collateral at risk:{" "}
-            {collateralAmount.toLocaleString()}
+            {crRisk.toFixed(2)}% of troves under low CR, collateral sum:{" "}
+            {totalCollateral.toLocaleString()}
           </small>
         </div>
       </div>
 
-      {/* ================= POOL CARD ================= */}
+      {/* Pool Card */}
       <div
+        className="card"
         style={{
           border: isTop ? "2px solid #4ade80" : "1px solid #1f2937",
-          boxShadow: isTop ? "0 0 12px rgba(74,222,128,.4)" : "none",
-          padding: "16px",
-          borderRadius: "12px",
+          boxShadow: isTop ? "0 0 12px rgba(74, 222, 128, 0.4)" : "none",
+          padding: 16,
+          borderRadius: 12,
           backgroundColor: "#0b1220",
         }}
       >
         {/* Header */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-          <Image
-            src={`/tokens/${name}.png`}
-            alt={name}
-            width={24}
-            height={24}
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Image src={`/tokens/${name}.png`} alt={name} width={24} height={24} priority />
           <h3 style={{ color: "#4ade80", margin: 0 }}>
             {name} {isTop && "🔥"}
           </h3>
         </div>
 
+        {/* Deposited */}
         <p>
           <strong>BOLD Deposited:</strong><br />
           {deposit.toLocaleString()} BOLD
         </p>
 
+        {/* Liquidated */}
         <p>
           <strong>Liquidated Collateral (USD):</strong><br />
           ${liquidation.toLocaleString()}
         </p>
 
-        {/* ================= PROFITABILITY ================= */}
-        <div style={{ marginTop: "14px" }}>
-          <strong style={{ display: "flex", gap: "6px" }}>
+        {/* Profitability Bar */}
+        <div style={{ marginTop: 14 }}>
+          <strong style={{ display: "flex", alignItems: "center", gap: 6 }}>
             Profitability
             <InfoTooltip learnMoreUrl="https://docs.liquity.org" />
           </strong>
-
           <div
             style={{
-              marginTop: "6px",
+              marginTop: 6,
               background: "#1f2937",
-              borderRadius: "10px",
-              height: "14px",
+              borderRadius: 10,
+              height: 14,
+              overflow: "hidden",
             }}
           >
             <div
               style={{
-                width: `${profitabilityRatio * 100}%`,
+                width: `${profitability * 100}%`,
                 height: "100%",
                 background: isTop ? "#22c55e" : "#4ade80",
                 transition: "width 0.4s ease",
@@ -143,15 +124,16 @@ export default function PoolCard({
           </div>
         </div>
 
-        {/* ================= APY ================= */}
-        <div style={{ marginTop: "14px" }}>
+        {/* Average APY */}
+        <div style={{ marginTop: 14 }}>
           <strong>Average APY</strong>
           <div
             style={{
-              marginTop: "6px",
+              marginTop: 6,
               background: "#1f2937",
-              borderRadius: "10px",
-              height: "14px",
+              borderRadius: 10,
+              height: 14,
+              overflow: "hidden",
             }}
           >
             <div
@@ -159,6 +141,7 @@ export default function PoolCard({
                 width: `${Math.min(apy, 100)}%`,
                 height: "100%",
                 background: "#3b82f6",
+                transition: "width 0.4s ease",
               }}
             />
           </div>
@@ -166,17 +149,18 @@ export default function PoolCard({
         </div>
       </div>
 
-      {/* ================= STRESS TEST ================= */}
+      {/* Stress Test Slider */}
       <div
         style={{
-          marginTop: "12px",
-          padding: "12px",
+          marginTop: 12,
+          padding: 12,
           backgroundColor: "#1f2937",
-          borderRadius: "12px",
+          borderRadius: 12,
         }}
       >
-        <label>Price Drop Stress Test (%)</label>
-
+        <label style={{ display: "block", marginBottom: 6 }}>
+          Price Drop Stress Test (%)
+        </label>
         <input
           type="range"
           min={0}
@@ -185,9 +169,8 @@ export default function PoolCard({
           onChange={(e) => setPriceDrop(Number(e.target.value))}
           style={{ width: "100%", accentColor: stressColor }}
         />
-
         <small style={{ color: stressColor }}>
-          {priceDrop}% drop → liquidated collateral:{" "}
+          {priceDrop}% price drop → estimated liquidated collateral: $
           {liquidatedCollateral.toLocaleString()}
         </small>
       </div>
