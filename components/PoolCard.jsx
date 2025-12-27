@@ -1,4 +1,5 @@
 // components/PoolCard.jsx
+"use client";
 import Image from "next/image";
 import { useState, useMemo } from "react";
 import InfoTooltip from "./InfoTooltip";
