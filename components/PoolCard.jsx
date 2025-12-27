@@ -1,44 +1,34 @@
+<<<<<<< HEAD
 // components/PoolCard.jsx
 "use client";
+=======
+"use client";
+
+>>>>>>> 40ffa32 (Add risk summary PoolCard, CR & redemption risk, and stress test slider)
 import Image from "next/image";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import InfoTooltip from "./InfoTooltip";
 
 export default function PoolCard({
   name,
   deposit,
   liquidation,
-  profitability, // now expected to already be CR + redemption weighted
+  profitability,
   apy,
   isTop,
-  troves = [], // pass troves for this collateral later
+  crRisk = 0,               // optional: percentage of low CR troves
+  redemptionRisk = "Minimal", // optional: "High", "Moderate", "Minimal"
 }) {
-  /* =========================
-     Stress test slider state
-  ========================== */
+  // Slider state for stress test
   const [priceDrop, setPriceDrop] = useState(0);
 
-  /* =========================
-     Stress test calculation
-     (placeholder logic, safe)
-  ========================== */
-  const stressLiquidationUSD = useMemo(() => {
-    if (!troves.length) return 0;
+  // Calculate collateral liquidation for stress test
+  const stressLiquidation = (liquidation * priceDrop) / 100;
 
-    return troves.reduce((sum, t) => {
-      const newCR = t.cr * (1 - priceDrop / 100);
-      if (newCR < 1.1) {
-        return sum + (t.collateral_usd || 0);
-      }
-      return sum;
-    }, 0);
-  }, [priceDrop, troves]);
-
-  /* =========================
-     Slider color logic
-  ========================== */
-  const sliderColor =
-    priceDrop < 10 ? "#22c55e" : priceDrop < 25 ? "#facc15" : "#ef4444";
+  // Determine slider color based on risk
+  let sliderColor = "#4ade80"; // green low risk
+  if (priceDrop >= 20) sliderColor = "#facc15"; // yellow
+  if (priceDrop >= 40) sliderColor = "#f87171"; // red
 
   return (
     <div
@@ -49,42 +39,50 @@ export default function PoolCard({
         padding: "16px",
         borderRadius: "12px",
         backgroundColor: "#0b1220",
+        marginBottom: "16px",
       }}
     >
-      {/* ================= TOKEN HEADER ================= */}
+      {/* === Token Logo + Name + CR & Redemption Risk === */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          justifyContent: "space-between",
           marginBottom: "8px",
         }}
       >
-        <Image
-          src={`/tokens/${name}.png`}
-          alt={name}
-          width={24}
-          height={24}
-          priority
-        />
-        <h3 style={{ color: "#4ade80", margin: 0 }}>
-          {name} {isTop && "🔥"}
-        </h3>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Image
+            src={`/tokens/${name}.png`}
+            alt={name}
+            width={24}
+            height={24}
+            priority
+          />
+          <h3 style={{ color: "#4ade80", margin: 0 }}>
+            {name} {isTop && "🔥"}
+          </h3>
+        </div>
+
+        <div style={{ fontSize: "12px", color: "#facc15" }}>
+          CR Risk: {crRisk.toFixed(0)}% | Redemption Risk: {redemptionRisk}
+        </div>
       </div>
 
-      {/* ================= CORE METRICS ================= */}
+      {/* BOLD Deposited */}
       <p>
         <strong>BOLD Deposited:</strong>
         <br />
         {deposit.toLocaleString()} BOLD
       </p>
 
+      {/* Liquidated Collateral */}
       <p>
         <strong>Liquidated Collateral (USD):</strong>
         <br />${liquidation.toLocaleString()}
       </p>
 
-      {/* ================= PROFITABILITY ================= */}
+      {/* Profitability Section */}
       <div style={{ marginTop: "14px" }}>
         <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           Profitability
@@ -110,15 +108,12 @@ export default function PoolCard({
           />
         </div>
 
-        <small style={{ color: "#9ca3af" }}>
-          {profitability.toFixed(2)}%
-        </small>
+        <small style={{ color: "#9ca3af" }}>{profitability.toFixed(2)}%</small>
       </div>
 
-      {/* ================= APY ================= */}
+      {/* Average APY Section */}
       <div style={{ marginTop: "14px" }}>
         <strong>Average APY</strong>
-
         <div
           style={{
             marginTop: "6px",
@@ -137,38 +132,27 @@ export default function PoolCard({
             }}
           />
         </div>
-
         <small style={{ color: "#9ca3af" }}>{apy}%</small>
       </div>
 
-      {/* ================= STRESS TEST ================= */}
-      <div style={{ marginTop: "18px" }}>
-        <strong>Price Drop Stress Test</strong>
-
+      {/* Stress Test Slider */}
+      <div style={{ marginTop: "14px" }}>
+        <label style={{ fontSize: "12px" }}>Price Drop Stress Test: {priceDrop}%</label>
         <input
           type="range"
           min="0"
-          max="50"
+          max="100"
           value={priceDrop}
           onChange={(e) => setPriceDrop(Number(e.target.value))}
           style={{
             width: "100%",
-            marginTop: "8px",
             accentColor: sliderColor,
+            marginTop: "4px",
           }}
         />
-
-        <div
-          style={{
-            fontSize: "12px",
-            color: "#9ca3af",
-            marginTop: "6px",
-          }}
-        >
-          Price drop: {priceDrop}% <br />
-          Est. liquidated collateral: $
-          {stressLiquidationUSD.toLocaleString()}
-        </div>
+        <small style={{ color: "#9ca3af" }}>
+          Collateral at risk: ${stressLiquidation.toLocaleString()}
+        </small>
       </div>
     </div>
   );
