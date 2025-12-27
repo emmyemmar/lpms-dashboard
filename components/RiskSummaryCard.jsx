@@ -2,11 +2,18 @@
 
 export default function RiskSummaryCard({
   collateral,
-  crRiskPercent,
-  lowCrCollateralUSD,
-  redemptionRiskLabel,
-  bgColor,
+  crRiskPercent = 0,
+  lowCrCollateralUSD = 0,
+  redemptionRiskLabel = "Unknown",
+  bgColor = "#1f2937",
 }) {
+  const redemptionColor =
+    redemptionRiskLabel === "High"
+      ? "#f87171"
+      : redemptionRiskLabel === "Moderate"
+      ? "#facc15"
+      : "#4ade80";
+
   return (
     <div
       style={{
@@ -22,16 +29,20 @@ export default function RiskSummaryCard({
       </h3>
 
       <p style={{ marginTop: "8px", fontSize: "14px" }}>
-        <strong>Low CR Troves:</strong> {crRiskPercent.toFixed(1)}%
+        <strong>Low CR Troves:</strong>{" "}
+        {Number(crRiskPercent).toFixed(1)}%
       </p>
 
       <p style={{ fontSize: "14px" }}>
-        <strong>Collateral at Risk:</strong> $
-        {lowCrCollateralUSD.toLocaleString()}
+        <strong>Collateral at Risk:</strong>{" "}
+        ${Number(lowCrCollateralUSD).toLocaleString()}
       </p>
 
       <p style={{ fontSize: "14px" }}>
-        <strong>Redemption Risk:</strong> {redemptionRiskLabel}
+        <strong>Redemption Risk:</strong>{" "}
+        <span style={{ color: redemptionColor, fontWeight: 600 }}>
+          {redemptionRiskLabel}
+        </span>
       </p>
     </div>
   );
