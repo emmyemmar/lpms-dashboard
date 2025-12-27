@@ -1,5 +1,3 @@
-// app/dashboard/page.jsx
-
 import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
@@ -17,8 +15,19 @@ const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 // Enforced PoolCard order
 const POOLCARD_ORDER = ["wstETH", "WETH", "rETH"];
 
-// Threshold for Risk Summary CR
-const REQUIRED_CR_RISK = 1.4;
+// CR thresholds for risk summary
+const CR_RISK_THRESHOLD = {
+  WETH: 1.5,
+  wstETH: 1.6,
+  rETH: 1.6,
+};
+
+// Min CR for stress bar
+const MIN_CR_STRESS = {
+  WETH: 1.1,
+  wstETH: 1.2,
+  rETH: 1.2,
+};
 
 export default async function DashboardPage() {
   // ===== Fetch data =====
@@ -53,17 +62,25 @@ export default async function DashboardPage() {
     collateralType: normalizeCollateral(t.collateral_type),
     collateral_ratio: t.collateral_ratio,
     collateral: t.collateral,
-    requiredCR: 1.1, // for stress bar
   }));
+
+  // ===== Compute total collateral for profitability bar =====
+  const totalCollateralSum = {};
+  POOLCARD_ORDER.forEach((c) => {
+    totalCollateralSum[c] = allTroves
+      .filter((t) => t.collateralType === c)
+      .reduce((sum, t) => sum + t.collateral, 0);
+  });
+  const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
   // ===== Build dashboard rows =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
+    const minCRStress = MIN_CR_STRESS[c] || 1.1;
+    const crRiskThreshold = CR_RISK_THRESHOLD[c] || 1.4;
 
-    const lowCRTroves = troves.filter((t) => t.collateral_ratio < 1.1); // Stress bar
-    const crRiskTroves = troves.filter((t) => t.collateral_ratio <= REQUIRED_CR_RISK); // Risk summary
-
-    const totalCollateral = troves.reduce((sum, t) => sum + t.collateral, 0);
+    const lowCRTroves = troves.filter((t) => t.collateral_ratio < minCRStress);
+    const crRiskTroves = troves.filter((t) => t.collateral_ratio <= crRiskThreshold);
 
     return {
       name: c,
@@ -71,22 +88,22 @@ export default async function DashboardPage() {
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
       lowCRTroves,
-      crRiskTroves,
-      totalCollateral,
+      crRisk: crRiskTroves.length
+        ? (crRiskTroves.length / troves.length) * 100
+        : 0,
+      totalCollateral: totalCollateralSum[c] || 0,
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
+      profitability: totalCollateralSum[c] / maxCollateral / 2, // highest loads 50%, others proportional
     };
   });
 
-  // ===== Top recommended pool =====
   const topCollateral = data.reduce(
-    (best, cur) =>
-      cur.totalCollateral > best.totalCollateral ? cur : best,
+    (best, cur) => (cur.totalCollateral > best.totalCollateral ? cur : best),
     data[0]
   ).name;
 
   return (
     <>
-      {/* HEADER */}
       <header
         style={{
           position: "sticky",
@@ -105,21 +122,16 @@ export default async function DashboardPage() {
         <h1 style={{ color: "#fff", marginLeft: 12 }}>LPMS Dashboard</h1>
       </header>
 
-      {/* MAIN */}
       <main style={{ padding: 32, maxWidth: 1200, margin: "0 auto" }}>
-        <p style={{ color: "#6b7280", fontSize: 12 }}>
-          Last updated: {lastUpdated}
-        </p>
+        <p style={{ color: "#6b7280", fontSize: 12 }}>Last updated: {lastUpdated}</p>
 
         <p style={{ color: "#9ca3af", marginTop: 14 }}>
           🔥 <strong>Recommended Stability Pool:</strong>{" "}
           <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
-        {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
-
           <div
             style={{
               display: "grid",
@@ -135,19 +147,19 @@ export default async function DashboardPage() {
                 deposit={item.deposit}
                 liquidation={item.liquidationUSD}
                 apy={item.apy}
-                crRisk={item.crRiskTroves.length > 0 ? (item.crRiskTroves.length / item.totalCollateral) * 100 : 0}
+                crRisk={item.crRisk}
                 redemptionRisk={item.redemptionRisk}
                 collateralAmount={item.totalCollateral}
-                profitability={item.totalCollateral}
+                profitability={item.profitability}
                 isTop={item.name === topCollateral}
                 lowCRTroves={item.lowCRTroves}
                 totalCollateral={item.totalCollateral}
+                minCRRequirement={MIN_CR_STRESS[item.name]}
               />
             ))}
           </div>
         </section>
 
-        {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
           <TroveScanner allTroves={allTroves} />
