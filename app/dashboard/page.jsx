@@ -1,3 +1,5 @@
+// app/dashboard/page.jsx
+
 import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
@@ -9,14 +11,10 @@ import { fetchAverageAPY } from "../../lib/dune/fetchAverageAPY";
 import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 
-/**
- * Normalize ETH → WETH everywhere
- */
+// Normalize ETH → WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
-/**
- * Enforced PoolCard order
- */
+// Enforced PoolCard order
 const POOLCARD_ORDER = ["wstETH", "WETH", "rETH"];
 
 export default async function DashboardPage() {
@@ -24,56 +22,46 @@ export default async function DashboardPage() {
   const depositsRaw = (await fetchBoldDeposit()) || {};
   const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
-  const allTroves = (await fetchAllTroves()) || [];
+  const allTrovesRaw = (await fetchAllTroves()) || [];
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
 
   const lastUpdated = new Date().toUTCString();
 
-  // ===== Normalize deposits / liquidation / APY =====
+  // ===== Normalize deposits/liquidations/APY =====
   const deposits = {};
   const liquidations = {};
   const apyValues = {};
-  const redemptionRisks = {};
-
   for (const [k, v] of Object.entries(depositsRaw)) {
     const key = normalizeCollateral(k);
     deposits[key] = (deposits[key] || 0) + v;
   }
-
   for (const [k, v] of Object.entries(liquidationsRaw)) {
     const key = normalizeCollateral(k);
     liquidations[key] = (liquidations[key] || 0) + v;
   }
-
   for (const [k, v] of Object.entries(apyRaw)) {
     const key = normalizeCollateral(k);
     apyValues[key] = v;
   }
 
-  for (const [k, v] of Object.entries(redemptionRisksRaw)) {
-    const key = normalizeCollateral(k);
-    redemptionRisks[key] = v;
-  }
-
   // ===== Normalize troves =====
-  const normalizedTroves = allTroves.map((t) => ({
+  const allTroves = allTrovesRaw.map((t) => ({
     ...t,
     collateralType: normalizeCollateral(t.collateralType),
   }));
 
-  // ===== Low-CR collateral sum (profitability ratio) =====
+  // ===== Low CR collateral sum =====
   const lowCRCollateral = {};
   POOLCARD_ORDER.forEach((c) => {
-    lowCRCollateral[c] = normalizedTroves
+    lowCRCollateral[c] = allTroves
       .filter((t) => t.collateralType === c && t.cr < t.requiredCR)
-      .reduce((sum, t) => sum + (t.collateralAmount || 0), 0);
+      .reduce((sum, t) => sum + t.collateralAmount, 0);
   });
-
   const maxLowCR = Math.max(...Object.values(lowCRCollateral), 1);
 
   // ===== Build dashboard rows =====
   const data = POOLCARD_ORDER.map((c) => {
-    const troves = normalizedTroves.filter((t) => t.collateralType === c);
+    const troves = allTroves.filter((t) => t.collateralType === c);
     const lowCRT = troves.filter((t) => t.cr < t.requiredCR);
 
     return {
@@ -82,7 +70,7 @@ export default async function DashboardPage() {
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
       crRisk: troves.length ? (lowCRT.length / troves.length) * 100 : 0,
-      redemptionRisk: redemptionRisks[c] || "Minimal",
+      redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       collateralAmount: lowCRCollateral[c],
       profitability: lowCRCollateral[c] / maxLowCR,
       lowCRTroves: lowCRT,
@@ -131,6 +119,7 @@ export default async function DashboardPage() {
         {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
+
           <div
             style={{
               display: "grid",
@@ -161,7 +150,7 @@ export default async function DashboardPage() {
         {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
-          <TroveScanner allTroves={normalizedTroves} />
+          <TroveScanner allTroves={allTroves} />
         </section>
       </main>
 
