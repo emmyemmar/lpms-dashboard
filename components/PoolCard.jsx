@@ -61,7 +61,7 @@ export default function PoolCard({
         </div>
         <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(4)}% of troves under low CR (≤1.4), collateral sum:{" "}
+            {crRisk.toFixed(10)}% of troves under low CR (≤1.4), collateral sum:{" "}
             {totalCollateral.toLocaleString()}
           </small>
         </div>
