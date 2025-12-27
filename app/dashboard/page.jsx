@@ -1,5 +1,3 @@
-// app/dashboard/page.jsx
-
 import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
@@ -11,76 +9,90 @@ import { fetchAverageAPY } from "../../lib/dune/fetchAverageAPY";
 import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 
-// Normalize ETH → WETH
+/**
+ * Normalize ETH → WETH everywhere
+ */
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
-// Enforced PoolCard order
+/**
+ * Enforced PoolCard order
+ */
 const POOLCARD_ORDER = ["wstETH", "WETH", "rETH"];
-
-// Threshold for Risk Summary CR
-const REQUIRED_CR_RISK = 1.4;
 
 export default async function DashboardPage() {
   // ===== Fetch data =====
   const depositsRaw = (await fetchBoldDeposit()) || {};
   const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
-  const allTrovesRaw = (await fetchAllTroves()) || [];
+  const allTroves = (await fetchAllTroves()) || [];
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
 
   const lastUpdated = new Date().toUTCString();
 
-  // ===== Normalize deposits/liquidations/APY =====
+  // ===== Normalize deposits / liquidation / APY =====
   const deposits = {};
   const liquidations = {};
   const apyValues = {};
+  const redemptionRisks = {};
+
   for (const [k, v] of Object.entries(depositsRaw)) {
     const key = normalizeCollateral(k);
     deposits[key] = (deposits[key] || 0) + v;
   }
+
   for (const [k, v] of Object.entries(liquidationsRaw)) {
     const key = normalizeCollateral(k);
     liquidations[key] = (liquidations[key] || 0) + v;
   }
+
   for (const [k, v] of Object.entries(apyRaw)) {
     const key = normalizeCollateral(k);
     apyValues[key] = v;
   }
 
+  for (const [k, v] of Object.entries(redemptionRisksRaw)) {
+    const key = normalizeCollateral(k);
+    redemptionRisks[key] = v;
+  }
+
   // ===== Normalize troves =====
-  const allTroves = allTrovesRaw.map((t) => ({
+  const normalizedTroves = allTroves.map((t) => ({
     ...t,
-    collateralType: normalizeCollateral(t.collateral_type),
-    collateral_ratio: t.collateral_ratio,
-    collateral: t.collateral,
-    requiredCR: 1.1, // for stress bar
+    collateralType: normalizeCollateral(t.collateralType),
   }));
+
+  // ===== Low-CR collateral sum (profitability ratio) =====
+  const lowCRCollateral = {};
+  POOLCARD_ORDER.forEach((c) => {
+    lowCRCollateral[c] = normalizedTroves
+      .filter((t) => t.collateralType === c && t.cr < t.requiredCR)
+      .reduce((sum, t) => sum + (t.collateralAmount || 0), 0);
+  });
+
+  const maxLowCR = Math.max(...Object.values(lowCRCollateral), 1);
 
   // ===== Build dashboard rows =====
   const data = POOLCARD_ORDER.map((c) => {
-    const troves = allTroves.filter((t) => t.collateralType === c);
-
-    const lowCRTroves = troves.filter((t) => t.collateral_ratio < 1.1); // Stress bar
-    const crRiskTroves = troves.filter((t) => t.collateral_ratio <= REQUIRED_CR_RISK); // Risk summary
-
-    const totalCollateral = troves.reduce((sum, t) => sum + t.collateral, 0);
+    const troves = normalizedTroves.filter((t) => t.collateralType === c);
+    const lowCRT = troves.filter((t) => t.cr < t.requiredCR);
 
     return {
       name: c,
       deposit: deposits[c] || 0,
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
-      lowCRTroves,
-      crRiskTroves,
-      totalCollateral,
-      redemptionRisk: redemptionRisksRaw[c] || "Minimal",
+      crRisk: troves.length ? (lowCRT.length / troves.length) * 100 : 0,
+      redemptionRisk: redemptionRisks[c] || "Minimal",
+      collateralAmount: lowCRCollateral[c],
+      profitability: lowCRCollateral[c] / maxLowCR,
+      lowCRTroves: lowCRT,
+      allTroves: troves,
     };
   });
 
   // ===== Top recommended pool =====
   const topCollateral = data.reduce(
-    (best, cur) =>
-      cur.totalCollateral > best.totalCollateral ? cur : best,
+    (best, cur) => (cur.profitability > best.profitability ? cur : best),
     data[0]
   ).name;
 
@@ -119,7 +131,6 @@ export default async function DashboardPage() {
         {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
-
           <div
             style={{
               display: "grid",
@@ -135,13 +146,13 @@ export default async function DashboardPage() {
                 deposit={item.deposit}
                 liquidation={item.liquidationUSD}
                 apy={item.apy}
-                crRisk={item.crRiskTroves.length > 0 ? (item.crRiskTroves.length / item.totalCollateral) * 100 : 0}
+                crRisk={item.crRisk}
                 redemptionRisk={item.redemptionRisk}
-                collateralAmount={item.totalCollateral}
-                profitability={item.totalCollateral}
+                collateralAmount={item.collateralAmount}
+                profitability={item.profitability}
                 isTop={item.name === topCollateral}
                 lowCRTroves={item.lowCRTroves}
-                totalCollateral={item.totalCollateral}
+                totalCollateral={item.collateralAmount}
               />
             ))}
           </div>
@@ -150,7 +161,7 @@ export default async function DashboardPage() {
         {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
-          <TroveScanner allTroves={allTroves} />
+          <TroveScanner allTroves={normalizedTroves} />
         </section>
       </main>
 
