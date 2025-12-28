@@ -10,19 +10,21 @@ export default function PoolCard({
   liquidation = 0,
   apy = 0,
   isTop = false,
-  crRisk = 0,                  // % of troves under low CR
-  crRiskThreshold = 1.4,       // Threshold for risk summary display
-  redemptionRisk = "Minimal", 
-  allTroves = [],              // **all troves for this collateral type**
-  totalCollateral = 0,         // total collateral sum for this type
-  minCRRequirement = 1.1,      // for stress bar
-  profitability = 0,           // 0-1 ratio for bar
+  crRisk = 0,
+  crRiskThreshold = 1.4,
+  redemptionRisk = "Minimal",
+  lowCRTroves = [],        // All troves for this collateral type
+  totalCollateral = 0,
+  minCRRequirement = 1.1,  // Stress bar min CR for this type
+  profitability = 0,
 }) {
   const [priceDrop, setPriceDrop] = useState(0);
 
   // ===== Stress Test Calculation =====
-  const liquidatedCollateral = allTroves
-    .filter((t) => t.collateral_ratio * (1 - priceDrop / 100) < minCRRequirement)
+  const liquidatedCollateral = lowCRTroves
+    .filter(
+      (t) => t.collateral_ratio * (1 - priceDrop / 100) < minCRRequirement
+    )
     .reduce((sum, t) => sum + (t.collateral || 0), 0);
 
   const stressBarWidth = totalCollateral
@@ -78,7 +80,6 @@ export default function PoolCard({
           backgroundColor: "#0b1220",
         }}
       >
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <Image src={`/tokens/${name}.png`} alt={name} width={24} height={24} priority />
           <h3 style={{ color: "#4ade80", margin: 0 }}>
@@ -86,13 +87,11 @@ export default function PoolCard({
           </h3>
         </div>
 
-        {/* Deposited */}
         <p>
           <strong>BOLD Deposited:</strong><br />
           {deposit.toLocaleString()} BOLD
         </p>
 
-        {/* Liquidated */}
         <p>
           <strong>Liquidated Collateral (USD):</strong><br />
           ${liquidation.toLocaleString()}
