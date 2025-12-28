@@ -79,8 +79,12 @@ export default async function DashboardPage() {
     const minCRStress = MIN_CR_STRESS[c] || 1.1;
     const crRiskThreshold = CR_RISK_THRESHOLD[c] || 1.4;
 
-    const lowCRTroves = troves.filter((t) => t.collateral_ratio < minCRStress);
+    // Troves below risk summary threshold
     const crRiskTroves = troves.filter((t) => t.collateral_ratio <= crRiskThreshold);
+    const crRiskCollateralSum = crRiskTroves.reduce((sum, t) => sum + (t.collateral || 0), 0);
+
+    // Troves for stress bar (all troves will be considered in PoolCard)
+    const lowCRTroves = troves;
 
     return {
       name: c,
@@ -91,11 +95,12 @@ export default async function DashboardPage() {
       crRisk: crRiskTroves.length
         ? (crRiskTroves.length / troves.length) * 100
         : 0,
+      crRiskCollateralSum,       // Pass total collateral for risk summary
       totalCollateral: totalCollateralSum[c] || 0,
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
-      profitability: totalCollateralSum[c] / maxCollateral / 2, // highest loads 50%, others proportional
-      crRiskThreshold, // Pass threshold for risk summary display
-      minCRStress,     // Pass minCR for stress bar
+      profitability: totalCollateralSum[c] / maxCollateral / 2,
+      crRiskThreshold,
+      minCRStress,
     };
   });
 
@@ -150,14 +155,15 @@ export default async function DashboardPage() {
                 liquidation={item.liquidationUSD}
                 apy={item.apy}
                 crRisk={item.crRisk}
-                crRiskThreshold={item.crRiskThreshold} // NEW
+                crRiskCollateralSum={item.crRiskCollateralSum} // NEW prop
+                crRiskThreshold={item.crRiskThreshold}
                 redemptionRisk={item.redemptionRisk}
                 collateralAmount={item.totalCollateral}
                 profitability={item.profitability}
                 isTop={item.name === topCollateral}
                 lowCRTroves={item.lowCRTroves}
                 totalCollateral={item.totalCollateral}
-                minCRRequirement={item.minCRStress}  // stress bar CR
+                minCRRequirement={item.minCRStress}
               />
             ))}
           </div>
