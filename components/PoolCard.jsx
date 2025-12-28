@@ -10,11 +10,12 @@ export default function PoolCard({
   liquidation = 0,
   apy = 0,
   isTop = false,
-  crRisk = 0,                  // % of troves under low CR
+  crRisk = 0,                  // % of troves under low CR (for risk summary)
+  crRiskThreshold = 1.6,       // threshold for risk summary CR per collateral type
   redemptionRisk = "Minimal", 
   lowCRTroves = [],            // troves for stress bar
   totalCollateral = 0,         // total collateral sum for this type
-  minCRRequirement = 1.1,      // for stress bar
+  minCRRequirement = 1.1,      // for stress bar calculation
   profitability = 0,           // 0-1 ratio for bar
 }) {
   const [priceDrop, setPriceDrop] = useState(0);
@@ -61,7 +62,7 @@ export default function PoolCard({
         </div>
         <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold)
+            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold})
             , collateral sum: {totalCollateral.toLocaleString()}
           </small>
         </div>
