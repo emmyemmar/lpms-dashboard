@@ -170,9 +170,11 @@ export default async function DashboardPage() {
         </section>
 
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
-          <TroveScanner allTroves={allTroves} />
-        </section>
+  <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
+  <div style={{ position: "sticky", top: 80, zIndex: 1000 }}>
+    <TroveScanner allTroves={allTroves} />
+  </div>
+</section>
       </main>
 
       <Footer />
