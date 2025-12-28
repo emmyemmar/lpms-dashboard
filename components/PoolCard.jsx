@@ -62,7 +62,7 @@ export default function PoolCard({
         </div>
         <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(4)}% of troves under low CR (â‰¤ {crRiskThreshold})
+            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold})
           </small>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function PoolCard({
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <Image src={`/tokens/${name}.png`} alt={name} width={24} height={24} priority />
           <h3 style={{ color: "#4ade80", margin: 0 }}>
-            {name} {isTop && "ðŸ”¥"}
+            {name} {isTop && "🔥"}
           </h3>
         </div>
 
@@ -170,7 +170,7 @@ export default function PoolCard({
           style={{ width: "100%", accentColor: stressColor }}
         />
         <small style={{ color: stressColor }}>
-          {priceDrop}% price drop â†’ estimated liquidated collateral: $
+          {priceDrop}% price drop → estimated liquidated collateral: $
           {liquidatedCollateral.toLocaleString()}
         </small>
       </div>
