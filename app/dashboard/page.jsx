@@ -94,6 +94,8 @@ export default async function DashboardPage() {
       totalCollateral: totalCollateralSum[c] || 0,
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2, // highest loads 50%, others proportional
+      crRiskThreshold, // Pass threshold for risk summary display
+      minCRStress,     // Pass minCR for stress bar
     };
   });
 
@@ -148,13 +150,14 @@ export default async function DashboardPage() {
                 liquidation={item.liquidationUSD}
                 apy={item.apy}
                 crRisk={item.crRisk}
+                crRiskThreshold={item.crRiskThreshold} // NEW
                 redemptionRisk={item.redemptionRisk}
                 collateralAmount={item.totalCollateral}
                 profitability={item.profitability}
                 isTop={item.name === topCollateral}
                 lowCRTroves={item.lowCRTroves}
                 totalCollateral={item.totalCollateral}
-                minCRRequirement={MIN_CR_STRESS[item.name]}
+                minCRRequirement={item.minCRStress}  // stress bar CR
               />
             ))}
           </div>
