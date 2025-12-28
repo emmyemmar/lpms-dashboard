@@ -9,7 +9,7 @@ import { fetchAverageAPY } from "../../lib/dune/fetchAverageAPY";
 import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 
-// Normalize ETH → WETH
+// Normalize ETH â†’ WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
 // Enforced PoolCard order
@@ -30,6 +30,7 @@ const MIN_CR_STRESS = {
 };
 
 export default async function DashboardPage() {
+  // ===== Fetch data =====
   const depositsRaw = (await fetchBoldDeposit()) || {};
   const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
 
   const lastUpdated = new Date().toUTCString();
 
-  // Normalize deposits/liquidations/APY
+  // ===== Normalize deposits/liquidations/APY =====
   const deposits = {};
   const liquidations = {};
   const apyValues = {};
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
     apyValues[key] = v;
   }
 
-  // Normalize troves
+  // ===== Normalize troves =====
   const allTroves = allTrovesRaw.map((t) => ({
     ...t,
     collateralType: normalizeCollateral(t.collateral_type),
@@ -63,7 +64,7 @@ export default async function DashboardPage() {
     collateral: t.collateral,
   }));
 
-  // Compute total collateral for profitability
+  // ===== Compute total collateral for profitability bar =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
@@ -72,16 +73,13 @@ export default async function DashboardPage() {
   });
   const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
-  // Build dashboard rows
+  // ===== Build dashboard rows =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
     const minCRStress = MIN_CR_STRESS[c] || 1.1;
     const crRiskThreshold = CR_RISK_THRESHOLD[c] || 1.4;
 
-    // Stress bar now considers all troves for dynamic price drop simulation
-    const lowCRTroves = troves; // all troves considered
-
-    // Risk summary based on threshold
+    const lowCRTroves = troves.filter((t) => t.collateral_ratio < minCRStress);
     const crRiskTroves = troves.filter((t) => t.collateral_ratio <= crRiskThreshold);
 
     return {
@@ -95,9 +93,9 @@ export default async function DashboardPage() {
         : 0,
       totalCollateral: totalCollateralSum[c] || 0,
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
-      profitability: totalCollateralSum[c] / maxCollateral / 2,
-      crRiskThreshold, // risk summary display
-      minCRStress,     // stress bar minCR
+      profitability: totalCollateralSum[c] / maxCollateral / 2, // highest loads 50%, others proportional
+      crRiskThreshold, // Pass threshold for risk summary display
+      minCRStress,     // Pass minCR for stress bar
     };
   });
 
@@ -130,7 +128,7 @@ export default async function DashboardPage() {
         <p style={{ color: "#6b7280", fontSize: 12 }}>Last updated: {lastUpdated}</p>
 
         <p style={{ color: "#9ca3af", marginTop: 14 }}>
-          🔥 <strong>Recommended Stability Pool:</strong>{" "}
+          ðŸ”¥ <strong>Recommended Stability Pool:</strong>{" "}
           <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
@@ -152,14 +150,14 @@ export default async function DashboardPage() {
                 liquidation={item.liquidationUSD}
                 apy={item.apy}
                 crRisk={item.crRisk}
-                crRiskThreshold={item.crRiskThreshold}
+                crRiskThreshold={item.crRiskThreshold} // NEW
                 redemptionRisk={item.redemptionRisk}
                 collateralAmount={item.totalCollateral}
                 profitability={item.profitability}
                 isTop={item.name === topCollateral}
                 lowCRTroves={item.lowCRTroves}
                 totalCollateral={item.totalCollateral}
-                minCRRequirement={item.minCRStress}  // for stress bar
+                minCRRequirement={item.minCRStress}  // stress bar CR
               />
             ))}
           </div>
