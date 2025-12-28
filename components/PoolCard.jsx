@@ -14,7 +14,8 @@ export default function PoolCard({
   crRiskThreshold = 1.4,       // Risk summary CR threshold
   redemptionRisk = "Minimal", 
   lowCRTroves = [],            // troves for stress bar
-  totalCollateral = 0,         // total collateral sum
+  totalCollateral = 0,         // total collateral sum for stress bar
+  crRiskCollateralSum = 0,     // total collateral sum for risk summary
   minCRRequirement = 1.1,      // stress bar CR
   profitability = 0,           // 0-1 ratio
 }) {
@@ -62,7 +63,7 @@ export default function PoolCard({
         </div>
         <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold})
+            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold}), collateral sum: ${crRiskCollateralSum.toLocaleString()}
           </small>
         </div>
       </div>
