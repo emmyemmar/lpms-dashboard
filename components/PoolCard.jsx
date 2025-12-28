@@ -13,7 +13,7 @@ export default function PoolCard({
   crRisk = 0,                  // % of troves under low CR
   crRiskThreshold = 1.4,       // Threshold for risk summary display
   redemptionRisk = "Minimal", 
-  lowCRTroves = [],            // troves for stress bar
+  allTroves = [],              // **all troves for this collateral type**
   totalCollateral = 0,         // total collateral sum for this type
   minCRRequirement = 1.1,      // for stress bar
   profitability = 0,           // 0-1 ratio for bar
@@ -21,7 +21,7 @@ export default function PoolCard({
   const [priceDrop, setPriceDrop] = useState(0);
 
   // ===== Stress Test Calculation =====
-  const liquidatedCollateral = lowCRTroves
+  const liquidatedCollateral = allTroves
     .filter((t) => t.collateral_ratio * (1 - priceDrop / 100) < minCRRequirement)
     .reduce((sum, t) => sum + (t.collateral || 0), 0);
 
