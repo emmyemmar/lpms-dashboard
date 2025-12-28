@@ -12,7 +12,7 @@ export default function PoolCard({
   isTop = false,
   crRisk = 0,                  // % of troves under low CR
   crRiskThreshold = 1.4,       // Risk summary CR threshold
-  redemptionRisk = "Minimal", 
+  redemptionRisk = "Minimal",
   lowCRTroves = [],            // troves for stress bar
   totalCollateral = 0,         // total collateral sum for stress bar
   crRiskCollateralSum = 0,     // total collateral sum for risk summary
@@ -23,7 +23,10 @@ export default function PoolCard({
 
   // ===== Stress Test Calculation =====
   const liquidatedCollateral = lowCRTroves
-    .filter((t) => t.collateral_ratio * (1 - priceDrop / 100) < minCRRequirement)
+    .filter(
+      (t) =>
+        t.collateral_ratio * (1 - priceDrop / 100) < minCRRequirement
+    )
     .reduce((sum, t) => sum + (t.collateral || 0), 0);
 
   const stressBarWidth = totalCollateral
@@ -45,7 +48,7 @@ export default function PoolCard({
 
   return (
     <div style={{ marginBottom: 24 }}>
-      {/* Risk Summary */}
+      {/* ================= Risk Summary ================= */}
       <div
         style={{
           backgroundColor: topCardColors[name] || "#1f2937",
@@ -61,27 +64,45 @@ export default function PoolCard({
           <strong>{name} Risk Summary</strong>
           <span>{redemptionRisk} Redemption Risk</span>
         </div>
+
         <div style={{ marginTop: 6 }}>
           <small>
-            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold}), collateral sum: ${crRiskCollateralSum.toLocaleString()}
+            {crRisk.toFixed(4)}% of troves under low CR (≤ {crRiskThreshold}),
+            collateral sum:{" "}
+            {crRiskCollateralSum.toLocaleString()} {name}
           </small>
         </div>
       </div>
 
-      {/* Pool Card */}
+      {/* ================= Pool Card ================= */}
       <div
         className="card"
         style={{
           border: isTop ? "2px solid #4ade80" : "1px solid #1f2937",
-          boxShadow: isTop ? "0 0 12px rgba(74, 222, 128, 0.4)" : "none",
+          boxShadow: isTop
+            ? "0 0 12px rgba(74, 222, 128, 0.4)"
+            : "none",
           padding: 16,
           borderRadius: 12,
           backgroundColor: "#0b1220",
         }}
       >
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <Image src={`/tokens/${name}.png`} alt={name} width={24} height={24} priority />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <Image
+            src={`/tokens/${name}.png`}
+            alt={name}
+            width={24}
+            height={24}
+            priority
+          />
           <h3 style={{ color: "#4ade80", margin: 0 }}>
             {name} {isTop && "🔥"}
           </h3>
@@ -89,14 +110,16 @@ export default function PoolCard({
 
         {/* Deposited */}
         <p>
-          <strong>BOLD Deposited:</strong><br />
+          <strong>BOLD Deposited:</strong>
+          <br />
           {deposit.toLocaleString()} BOLD
         </p>
 
         {/* Liquidated */}
         <p>
-          <strong>Liquidated Collateral (USD):</strong><br />
-          ${liquidation.toLocaleString()}
+          <strong>Liquidated Collateral:</strong>
+          <br />
+          {liquidation.toLocaleString()} {name}
         </p>
 
         {/* Profitability Bar */}
@@ -105,6 +128,7 @@ export default function PoolCard({
             Profitability
             <InfoTooltip learnMoreUrl="https://docs.liquity.org" />
           </strong>
+
           <div
             style={{
               marginTop: 6,
@@ -150,7 +174,7 @@ export default function PoolCard({
         </div>
       </div>
 
-      {/* Stress Test Slider */}
+      {/* ================= Stress Test ================= */}
       <div
         style={{
           marginTop: 12,
@@ -162,6 +186,7 @@ export default function PoolCard({
         <label style={{ display: "block", marginBottom: 6 }}>
           Price Drop Stress Test (%)
         </label>
+
         <input
           type="range"
           min={0}
@@ -170,9 +195,10 @@ export default function PoolCard({
           onChange={(e) => setPriceDrop(Number(e.target.value))}
           style={{ width: "100%", accentColor: stressColor }}
         />
+
         <small style={{ color: stressColor }}>
-          {priceDrop}% price drop → estimated liquidated collateral: $
-          {liquidatedCollateral.toLocaleString()}
+          {priceDrop}% price drop → estimated liquidated collateral:{" "}
+          {liquidatedCollateral.toLocaleString()} {name}
         </small>
       </div>
     </div>
