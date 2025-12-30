@@ -199,6 +199,66 @@ export default async function DashboardPage() {
 
           <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
+        {/* RECENT LIQUIDATIONS */}
+<section style={{ marginTop: 48 }}>
+  <h2 style={{ color: "#9ca3af" }}>
+    Recent Liquidations (All)
+  </h2>
+  <RecentLiquidationsTable rows={recentLiquidations} />
+</section>
+
+{/* ===== CR RANKING ===== */}
+<section style={{ marginTop: 48 }}>
+  <h2 style={{ color: "#9ca3af" }}>Top 10 Collateral Ratios by Pool</h2>
+
+  <div style={{ display: "flex", gap: 16 }}>
+    {["wstETH", "WETH", "rETH"].map((collateral, index) => {
+      const topTroves = allTroves
+        .filter((t) => t.collateralType === collateral)
+        .sort((a, b) => b.collateral_ratio - a.collateral_ratio)
+        .slice(0, 10);
+
+      const borderColor = ["#3b82f6", "#4ade80", "#facc15"][index]; // blue, green, yellow
+
+      return (
+        <div
+          key={collateral}
+          style={{
+            flex: 1,
+            border: `2px solid ${borderColor}`,
+            borderRadius: 8,
+            padding: 16,
+            backgroundColor: "#0b1220",
+          }}
+        >
+          <h3 style={{ color: borderColor, marginBottom: 12 }}>{collateral}</h3>
+          {topTroves.length === 0 ? (
+            <p style={{ color: "#9ca3af" }}>No data</p>
+          ) : (
+            <table style={{ width: "100%", color: "#fff", fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", paddingBottom: 8 }}>Trove ID</th>
+                  <th style={{ textAlign: "right", paddingBottom: 8 }}>CR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topTroves.map((t) => (
+                  <tr key={t.trove_id}>
+                    <td style={{ padding: "4px 0" }}>{t.trove_id}</td>
+                    <td style={{ textAlign: "right", padding: "4px 0" }}>
+                      {t.collateral_ratio.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      );
+    })}
+  </div>
+</section>
       </main>
 
       <Footer />
