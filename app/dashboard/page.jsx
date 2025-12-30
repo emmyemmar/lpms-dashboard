@@ -117,24 +117,17 @@ export default async function DashboardPage() {
     data[0]
   ).name;
 
-  // ===== Recent liquidations (last 30 days) =====
-  const now = Date.now();
-  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-
-  const recentLiquidations = recentLiquidationsRaw
-    .filter(
-      (l) => now - new Date(l.block_time).getTime() <= THIRTY_DAYS
-    )
-    .map((l) => ({
-      time: l.block_time,
-      ownerHtml: l.owner, // already an <a> tag from Dune
-      troveId: l.trove_id,
-      collateralType: normalizeCollateral(l.collateral_type),
-      collateralAmount: Math.abs(Number(l.collateral_change || 0)),
-      collateralPrice: Number(l.collateral_price || 0),
-      debt: Math.abs(Number(l.debt_change || 0)),
-      txHash: l.tx_hash,
-    }));
+  // ===== Recent liquidations (ALL from Dune) =====
+  const recentLiquidations = recentLiquidationsRaw.map((l) => ({
+    time: l.block_time,
+    ownerHtml: l.owner, // HTML <a> tag from Dune
+    troveId: l.trove_id,
+    collateralType: normalizeCollateral(l.collateral_type),
+    collateralAmount: Math.abs(Number(l.collateral_change || 0)),
+    collateralPrice: Number(l.collateral_price || 0),
+    debt: Math.abs(Number(l.debt_change || 0)),
+    txHash: l.tx_hash,
+  }));
 
   return (
     <>
@@ -201,7 +194,7 @@ export default async function DashboardPage() {
         {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>
-            Recent Liquidations (30 days)
+            Recent Liquidations (All)
           </h2>
 
           <RecentLiquidationsTable rows={recentLiquidations} />
