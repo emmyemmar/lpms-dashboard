@@ -117,10 +117,10 @@ export default async function DashboardPage() {
     data[0]
   ).name;
 
-  // ===== Recent liquidations (ALL from Dune) =====
+  // ===== Recent liquidations (ALL) =====
   const recentLiquidations = recentLiquidationsRaw.map((l) => ({
     time: l.block_time,
-    ownerHtml: l.owner, // HTML <a> tag from Dune
+    ownerHtml: l.owner, // already an <a> tag from Dune
     troveId: l.trove_id,
     collateralType: normalizeCollateral(l.collateral_type),
     collateralAmount: Math.abs(Number(l.collateral_change || 0)),
@@ -193,10 +193,7 @@ export default async function DashboardPage() {
 
         {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#9ca3af" }}>
-            Recent Liquidations (All)
-          </h2>
-
+          <h2 style={{ color: "#9ca3af" }}>Recent Liquidations</h2>
           <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
       </main>
