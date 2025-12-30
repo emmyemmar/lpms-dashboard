@@ -118,8 +118,8 @@ export default function PoolCard({
         {/* Liquidated */}
         <p>
           <strong>Liquidated Collateral:</strong>
-          <br />
-          {liquidation.toLocaleString()} {name}
+          <br /> $
+          {liquidation.toLocaleString()} 
         </p>
 
         {/* Profitability Bar */}
