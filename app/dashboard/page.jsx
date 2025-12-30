@@ -2,6 +2,7 @@ import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
 import Footer from "../../components/Footer";
+import { useState } from "react";
 
 import { fetchBoldDeposit } from "../../lib/dune/fetchBoldDeposit";
 import { fetchLiquidations } from "../../lib/dune/fetchLiquidations";
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
     collateral: t.collateral,
   }));
 
-  // ===== Compute total collateral for profitability bar =====
+  // ===== Compute total collateral =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
@@ -79,10 +80,9 @@ export default async function DashboardPage() {
 
   const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
-  // ===== Build dashboard rows =====
+  // ===== Build pool cards =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
-    const minCRStress = MIN_CR_STRESS[c];
     const crRiskThreshold = CR_RISK_THRESHOLD[c];
 
     const crRiskTroves = troves.filter(
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2,
       crRiskThreshold,
-      minCRStress,
+      minCRStress: MIN_CR_STRESS[c],
     };
   });
 
@@ -126,13 +126,18 @@ export default async function DashboardPage() {
     )
     .map((l) => ({
       time: l.block_time,
-      owner: l.owner, // HTML anchor from Dune
+      ownerHtml: l.owner,
       troveId: l.trove_id,
       collateralType: normalizeCollateral(l.collateral_type),
       collateralAmount: Math.abs(l.collateral_change),
       collateralPrice: l.collateral_price,
       debt: Math.abs(l.debt_change),
+      txHash: l.tx_hash,
     }));
+
+  // ===== Pagination state =====
+  const pageSizes = [10, 50, 100];
+  let pageSize = 10;
 
   return (
     <>
@@ -221,6 +226,7 @@ export default async function DashboardPage() {
                     "Amount",
                     "Price",
                     "Debt",
+                    "Tx",
                   ].map((h) => (
                     <th
                       key={h}
@@ -238,14 +244,14 @@ export default async function DashboardPage() {
               </thead>
 
               <tbody>
-                {recentLiquidations.map((l, i) => (
+                {recentLiquidations.slice(0, pageSize).map((l, i) => (
                   <tr key={i}>
                     <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
                       {l.time}
                     </td>
                     <td
                       style={{ borderLeft: "1px solid #1f2937", padding: 8 }}
-                      dangerouslySetInnerHTML={{ __html: l.owner }}
+                      dangerouslySetInnerHTML={{ __html: l.ownerHtml }}
                     />
                     <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
                       {l.troveId}
@@ -262,10 +268,30 @@ export default async function DashboardPage() {
                     <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
                       ${l.debt.toLocaleString()}
                     </td>
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                      <a
+                        href={`https://etherscan.io/tx/${l.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#60a5fa" }}
+                      >
+                        View
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination */}
+          <div style={{ marginTop: 12, color: "#6b7280" }}>
+            Show:
+            {pageSizes.map((s) => (
+              <span key={s} style={{ marginLeft: 12 }}>
+                {s}
+              </span>
+            ))}
           </div>
         </section>
       </main>
