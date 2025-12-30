@@ -46,14 +46,12 @@ export default function InfoTooltip({ learnMoreUrl }) {
           }}
         >
           <p style={{ marginBottom: "8px" }}>
-            <strong>Profitability</strong> estimates how effective a Stability
-            Pool is by comparing liquidation value captured versus total
-            deposits.
+            <strong>Profitability</strong> relative pool strength compared to others, derived from collateral dominance and liquidation exposure.
           </p>
 
           <p style={{ marginBottom: "8px" }}>
             <strong>APR</strong> shows reward rate only, while profitability
-            reflects real liquidation performance.
+            reflects liquidation performance.
           </p>
 
           <a
