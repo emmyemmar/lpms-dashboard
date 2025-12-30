@@ -8,6 +8,7 @@ import { fetchLiquidations } from "../../lib/dune/fetchLiquidations";
 import { fetchAverageAPY } from "../../lib/dune/fetchAverageAPY";
 import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
+import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations";
 
 // Normalize ETH → WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
   const apyRaw = (await fetchAverageAPY()) || {};
   const allTrovesRaw = (await fetchAllTroves()) || [];
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
+  const recentLiquidationsRaw = (await fetchRecentLiquidations()) || [];
 
   const lastUpdated = new Date().toUTCString();
 
@@ -80,16 +82,11 @@ export default async function DashboardPage() {
   // ===== Build dashboard rows =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
-    const minCRStress = MIN_CR_STRESS[c] || 1.1;
-    const crRiskThreshold = CR_RISK_THRESHOLD[c] || 1.4;
+    const minCRStress = MIN_CR_STRESS[c];
+    const crRiskThreshold = CR_RISK_THRESHOLD[c];
 
     const crRiskTroves = troves.filter(
       (t) => t.collateral_ratio <= crRiskThreshold
-    );
-
-    const crRiskCollateralSum = crRiskTroves.reduce(
-      (sum, t) => sum + (t.collateral || 0),
-      0
     );
 
     return {
@@ -97,12 +94,15 @@ export default async function DashboardPage() {
       deposit: deposits[c] || 0,
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
-      lowCRTroves: troves, // ALL troves for stress bar
+      lowCRTroves: troves,
       crRisk: troves.length
         ? (crRiskTroves.length / troves.length) * 100
         : 0,
-      crRiskCollateralSum,
-      totalCollateral: totalCollateralSum[c] || 0,
+      crRiskCollateralSum: crRiskTroves.reduce(
+        (sum, t) => sum + t.collateral,
+        0
+      ),
+      totalCollateral: totalCollateralSum[c],
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2,
       crRiskThreshold,
@@ -120,18 +120,19 @@ export default async function DashboardPage() {
   const now = Date.now();
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
-  const recentLiquidations =
-    liquidationsRaw?.rows
-      ?.filter(
-        (l) => now - new Date(l.block_time).getTime() <= THIRTY_DAYS
-      )
-      ?.map((l) => ({
-        owner: l.owner,
-        troveId: l.trove_id,
-        collateral: l.collateral,
-        collateralType: normalizeCollateral(l.collateral_type),
-        time: l.block_time,
-      })) || [];
+  const recentLiquidations = recentLiquidationsRaw
+    .filter(
+      (l) => now - new Date(l.block_time).getTime() <= THIRTY_DAYS
+    )
+    .map((l) => ({
+      time: l.block_time,
+      owner: l.owner, // HTML anchor from Dune
+      troveId: l.trove_id,
+      collateralType: normalizeCollateral(l.collateral_type),
+      collateralAmount: Math.abs(l.collateral_change),
+      collateralPrice: l.collateral_price,
+      debt: Math.abs(l.debt_change),
+    }));
 
   return (
     <>
@@ -195,36 +196,39 @@ export default async function DashboardPage() {
           <TroveScanner allTroves={allTroves} />
         </section>
 
-        {/* RECENT LIQUIDATIONS TABLE */}
+        {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>
             Recent Liquidations (30 days)
           </h2>
 
-          <div
-            style={{
-              marginTop: 12,
-              border: "1px solid #1f2937",
-              borderRadius: 12,
-              overflowX: "auto",
-            }}
-          >
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ background: "#0b1220" }}>
-                <tr style={{ color: "#9ca3af", fontSize: 13 }}>
+          <div style={{ overflowX: "auto", marginTop: 12 }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                color: "#9ca3af",
+                fontSize: 13,
+              }}
+            >
+              <thead>
+                <tr>
                   {[
+                    "Time",
                     "Owner",
                     "Trove ID",
                     "Collateral",
-                    "Type",
-                    "Time",
+                    "Amount",
+                    "Price",
+                    "Debt",
                   ].map((h) => (
                     <th
                       key={h}
                       style={{
-                        padding: "10px 12px",
+                        borderLeft: "1px solid #1f2937",
+                        padding: "8px 10px",
                         textAlign: "left",
-                        borderRight: "1px solid #1f2937",
+                        fontWeight: 500,
                       }}
                     >
                       {h}
@@ -235,28 +239,28 @@ export default async function DashboardPage() {
 
               <tbody>
                 {recentLiquidations.map((l, i) => (
-                  <tr
-                    key={i}
-                    style={{
-                      color: "#d1d5db",
-                      fontSize: 13,
-                      borderTop: "1px solid #1f2937",
-                    }}
-                  >
-                    <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                      {l.owner.slice(0, 6)}…{l.owner.slice(-4)}
+                  <tr key={i}>
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                      {l.time}
                     </td>
-                    <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
+                    <td
+                      style={{ borderLeft: "1px solid #1f2937", padding: 8 }}
+                      dangerouslySetInnerHTML={{ __html: l.owner }}
+                    />
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
                       {l.troveId}
                     </td>
-                    <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                      {l.collateral.toLocaleString()}
-                    </td>
-                    <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
                       {l.collateralType}
                     </td>
-                    <td style={{ padding: 10 }}>
-                      {new Date(l.time).toUTCString()}
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                      {l.collateralAmount.toFixed(4)}
+                    </td>
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                      ${l.collateralPrice.toLocaleString()}
+                    </td>
+                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                      ${l.debt.toLocaleString()}
                     </td>
                   </tr>
                 ))}
