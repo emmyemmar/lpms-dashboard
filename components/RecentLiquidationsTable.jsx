@@ -1,61 +1,80 @@
-"use client";
+"use client"; // Required for useState
 
 import { useState } from "react";
 
 export default function RecentLiquidationsTable({ rows }) {
   const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const visibleRows = rows.slice(0, pageSize);
+  const totalPages = Math.ceil(rows.length / pageSize);
+
+  const displayedRows = rows.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handlePageChange = (delta) => {
+    const newPage = currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const handlePageSizeChange = (e) => {
+    setPageSize(Number(e.target.value));
+    setCurrentPage(1); // reset to first page
+  };
 
   return (
-    <section style={{ marginTop: 48 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ color: "#9ca3af" }}>Recent Liquidations (30 days)</h2>
+    <div>
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
+        <label style={{ color: "#9ca3af" }}>
+          Show:
+          <select
+            value={pageSize}
+            onChange={handlePageSizeChange}
+            style={{ marginLeft: 6, padding: "2px 6px" }}
+          >
+            {[10, 50, 100].map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
 
-        {/* Pagination selector */}
-        <select
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          style={{
-            background: "#0b1220",
-            color: "#d1d5db",
-            border: "1px solid #1f2937",
-            borderRadius: 8,
-            padding: "6px 10px",
-          }}
+        <div style={{ color: "#9ca3af" }}>
+          Page {currentPage} of {totalPages || 1}
+        </div>
+
+        <button
+          onClick={() => handlePageChange(-1)}
+          disabled={currentPage === 1}
+          style={{ padding: "2px 6px", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
         >
-          <option value={10}>Last 10</option>
-          <option value={50}>Last 50</option>
-          <option value={100}>Last 100</option>
-        </select>
+          Prev
+        </button>
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === totalPages || totalPages === 0}
+          style={{ padding: "2px 6px", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+        >
+          Next
+        </button>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          border: "1px solid #1f2937",
-          borderRadius: 12,
-          overflowX: "auto",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", color: "#9ca3af", fontSize: 13 }}>
           <thead>
-            <tr style={{ color: "#9ca3af", fontSize: 13 }}>
-              {[
-                "Owner",
-                "Trove ID",
-                "Collateral",
-                "Price",
-                "Debt",
-                "Tx",
-                "Time",
-              ].map((h) => (
+            <tr>
+              {["Time", "Owner", "Trove ID", "Collateral", "Amount", "Price", "Debt", "Tx"].map((h) => (
                 <th
                   key={h}
                   style={{
-                    padding: "10px 12px",
+                    borderLeft: "1px solid #1f2937",
+                    padding: "8px 10px",
                     textAlign: "left",
-                    borderRight: "1px solid #1f2937",
+                    fontWeight: 500,
                   }}
                 >
                   {h}
@@ -63,67 +82,44 @@ export default function RecentLiquidationsTable({ rows }) {
               ))}
             </tr>
           </thead>
-
           <tbody>
-            {visibleRows.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ padding: 16, color: "#6b7280", textAlign: "center" }}>
-                  No liquidations in the last 30 days
-                </td>
-              </tr>
-            )}
-
-            {visibleRows.map((l, i) => (
-              <tr
-                key={i}
-                style={{
-                  color: "#d1d5db",
-                  fontSize: 13,
-                  borderTop: "1px solid #1f2937",
-                }}
-              >
-                {/* Owner (already HTML from Dune) */}
+            {displayedRows.map((row, i) => (
+              <tr key={i}>
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>{row.time}</td>
                 <td
-                  style={{ padding: 10, borderRight: "1px solid #1f2937" }}
-                  dangerouslySetInnerHTML={{ __html: l.ownerHtml }}
+                  style={{ borderLeft: "1px solid #1f2937", padding: 8 }}
+                  dangerouslySetInnerHTML={{ __html: row.ownerHtml }}
                 />
-
-                <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                  {l.troveId}
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>{row.troveId}</td>
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>{row.collateralType}</td>
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                  {row.collateralAmount.toFixed(4)}
                 </td>
-
-                <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                  {l.collateralAmount.toFixed(4)} {l.collateralType}
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                  ${row.collateralPrice.toLocaleString()}
                 </td>
-
-                <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                  ${l.collateralPrice.toLocaleString()}
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                  ${row.debt.toLocaleString()}
                 </td>
-
-                <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                  {l.debt.toLocaleString()} BOLD
-                </td>
-
-                {/* Tx hash → Etherscan */}
-                <td style={{ padding: 10, borderRight: "1px solid #1f2937" }}>
-                  <a
-                    href={`https://etherscan.io/tx/${l.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "#60a5fa" }}
-                  >
-                    View
-                  </a>
-                </td>
-
-                <td style={{ padding: 10 }}>
-                  {new Date(l.time).toUTCString()}
+                <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
+                  {row.txHash ? (
+                    <a
+                      href={`https://etherscan.io/tx/${row.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#4ade80" }}
+                    >
+                      View
+                    </a>
+                  ) : (
+                    "-"
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
   );
 }
