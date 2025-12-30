@@ -2,7 +2,7 @@ import Image from "next/image";
 import PoolCard from "../../components/PoolCard";
 import TroveScanner from "../../components/TroveScanner";
 import Footer from "../../components/Footer";
-import { useState } from "react";
+import RecentLiquidationsTable from "../../components/RecentLiquidationsTable";
 
 import { fetchBoldDeposit } from "../../lib/dune/fetchBoldDeposit";
 import { fetchLiquidations } from "../../lib/dune/fetchLiquidations";
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
 
   const lastUpdated = new Date().toUTCString();
 
-  // ===== Normalize deposits/liquidations/APY =====
+  // ===== Normalize deposits / liquidations / APY =====
   const deposits = {};
   const liquidations = {};
   const apyValues = {};
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
     collateral: t.collateral,
   }));
 
-  // ===== Compute total collateral =====
+  // ===== Compute total collateral per pool =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
@@ -80,10 +80,11 @@ export default async function DashboardPage() {
 
   const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
-  // ===== Build pool cards =====
+  // ===== Build PoolCard data =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
     const crRiskThreshold = CR_RISK_THRESHOLD[c];
+    const minCRStress = MIN_CR_STRESS[c];
 
     const crRiskTroves = troves.filter(
       (t) => t.collateral_ratio <= crRiskThreshold
@@ -106,7 +107,7 @@ export default async function DashboardPage() {
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2,
       crRiskThreshold,
-      minCRStress: MIN_CR_STRESS[c],
+      minCRStress,
     };
   });
 
@@ -126,18 +127,14 @@ export default async function DashboardPage() {
     )
     .map((l) => ({
       time: l.block_time,
-      ownerHtml: l.owner,
+      ownerHtml: l.owner, // already an <a> tag from Dune
       troveId: l.trove_id,
       collateralType: normalizeCollateral(l.collateral_type),
-      collateralAmount: Math.abs(l.collateral_change),
-      collateralPrice: l.collateral_price,
-      debt: Math.abs(l.debt_change),
+      collateralAmount: Math.abs(Number(l.collateral_change || 0)),
+      collateralPrice: Number(l.collateral_price || 0),
+      debt: Math.abs(Number(l.debt_change || 0)),
       txHash: l.tx_hash,
     }));
-
-  // ===== Pagination state =====
-  const pageSizes = [10, 50, 100];
-  let pageSize = 10;
 
   return (
     <>
@@ -207,92 +204,7 @@ export default async function DashboardPage() {
             Recent Liquidations (30 days)
           </h2>
 
-          <div style={{ overflowX: "auto", marginTop: 12 }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                color: "#9ca3af",
-                fontSize: 13,
-              }}
-            >
-              <thead>
-                <tr>
-                  {[
-                    "Time",
-                    "Owner",
-                    "Trove ID",
-                    "Collateral",
-                    "Amount",
-                    "Price",
-                    "Debt",
-                    "Tx",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        borderLeft: "1px solid #1f2937",
-                        padding: "8px 10px",
-                        textAlign: "left",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {recentLiquidations.slice(0, pageSize).map((l, i) => (
-                  <tr key={i}>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      {l.time}
-                    </td>
-                    <td
-                      style={{ borderLeft: "1px solid #1f2937", padding: 8 }}
-                      dangerouslySetInnerHTML={{ __html: l.ownerHtml }}
-                    />
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      {l.troveId}
-                    </td>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      {l.collateralType}
-                    </td>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      {l.collateralAmount.toFixed(4)}
-                    </td>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      ${l.collateralPrice.toLocaleString()}
-                    </td>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      ${l.debt.toLocaleString()}
-                    </td>
-                    <td style={{ borderLeft: "1px solid #1f2937", padding: 8 }}>
-                      <a
-                        href={`https://etherscan.io/tx/${l.txHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: "#60a5fa" }}
-                      >
-                        View
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div style={{ marginTop: 12, color: "#6b7280" }}>
-            Show:
-            {pageSizes.map((s) => (
-              <span key={s} style={{ marginLeft: 12 }}>
-                {s}
-              </span>
-            ))}
-          </div>
+          <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
       </main>
 
