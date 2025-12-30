@@ -199,13 +199,6 @@ export default async function DashboardPage() {
 
           <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
-        {/* RECENT LIQUIDATIONS */}
-<section style={{ marginTop: 48 }}>
-  <h2 style={{ color: "#9ca3af" }}>
-    Recent Liquidations (All)
-  </h2>
-  <RecentLiquidationsTable rows={recentLiquidations} />
-</section>
 
 {/* ===== CR RANKING ===== */}
 <section style={{ marginTop: 48 }}>
