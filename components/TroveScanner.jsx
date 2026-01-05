@@ -87,8 +87,8 @@ export default function TroveScanner({
       .map((t) => Number(t.collateral_ratio));
 
     lenderStats[c] = lenderDeposits
-      .filter((d) => d.collateral_type === c)
-      .map((d) => Number(d.deposit_amount));
+      .filter((d) => d.collateralType === c)
+      .map((d) => Number(d.depositAmount));
   });
 
   /* ---------- Render ---------- */
@@ -190,18 +190,18 @@ export default function TroveScanner({
           </h3>
 
           {lenderResults.map((d, i) => {
-            const values = lenderStats[d.collateral_type] || [];
+            const values = lenderStats[d.collateralType] || [];
             const percentile = getPercentileRank(
-              Number(d.deposit_amount),
+              Number(d.depositAmount),
               values
             );
             const rec = recommendation(
-              Number(d.deposit_amount),
+              Number(d.depositAmount),
               values,
               "Increase deposit by"
             );
 
-            const apyCompare = comparisonAPY[d.collateral_type] || {};
+            const apyCompare = comparisonAPY[d.collateralType] || {};
             const bestAlt = Object.entries(apyCompare).sort(
               (a, b) => b[1] - a[1]
             )[0];
@@ -221,11 +221,16 @@ export default function TroveScanner({
                 <RankCircle percent={percentile} />
 
                 <div style={{ flex: 1 }}>
-                  <strong>{d.collateral_type}</strong>
-                  <p>Deposit: {Number(d.deposit_amount).toLocaleString()} BOLD</p>
-                  <p>Depositor Age: {d.depositor_age}</p>
-                  <p>Last Modified: {d.last_modified}</p>
-                  <p>Unclaimed Rewards: {Number(d.unclaimed_bold).toFixed(2)} BOLD</p>
+                  <strong>{d.collateralType}</strong>
+                  <p>
+                    Deposit: {Number(d.depositAmount).toLocaleString()} BOLD
+                  </p>
+                  <p>Depositor Age: {d.depositorAge}</p>
+                  <p>Last Modified: {d.lastModified}</p>
+                  <p>
+                    Unclaimed Rewards:{" "}
+                    {Number(d.unclaimedBold).toFixed(2)} BOLD
+                  </p>
 
                   {rec && <p style={{ color: "#4ade80" }}>{rec}</p>}
 
