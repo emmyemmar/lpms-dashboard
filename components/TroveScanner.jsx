@@ -4,13 +4,13 @@ import { useState } from "react";
 
 // Utility: compute top % ranking
 function getPercentileRank(value, allValues) {
-  if (!allValues.length) return 0;
+  if (!allValues || !allValues.length) return 0;
   const sorted = [...allValues].sort((a, b) => b - a);
   const rank = sorted.findIndex((v) => value >= v);
   return rank === -1 ? 100 : Math.round(((rank + 1) / sorted.length) * 100);
 }
 
-export default function TroveScanner({ allTroves, lenderDeposits }) {
+export default function TroveScanner({ allTroves = [], lenderDeposits = [] }) {
   const [address, setAddress] = useState("");
   const [borrowerResults, setBorrowerResults] = useState([]);
   const [lenderResults, setLenderResults] = useState([]);
@@ -43,25 +43,22 @@ export default function TroveScanner({ allTroves, lenderDeposits }) {
   const lenderStats = {};
 
   collateralTypes.forEach((c) => {
-    const borrowerTroves = allTroves
+    borrowerStats[c] = allTroves
       .filter((t) => t.collateralType === c)
-      .map((t) => t.collateral_ratio);
-    borrowerStats[c] = borrowerTroves;
+      .map((t) => Number(t.collateral_ratio));
 
-    const lenderAmounts = lenderDeposits
+    lenderStats[c] = lenderDeposits
       .filter((d) => d.collateral_type === c)
       .map((d) => Number(d.deposit_amount));
-    lenderStats[c] = lenderAmounts;
   });
 
   // Helper to get top 10% recommendation
   function recommendation(value, allValues, type = "add") {
-    if (!allValues.length) return null;
-    const top10Index = Math.floor(allValues.length * 0.1);
+    if (!allValues || !allValues.length) return null;
     const sorted = [...allValues].sort((a, b) => b - a);
+    const top10Index = Math.floor(allValues.length * 0.1);
     const top10Value = sorted[top10Index] || sorted[0];
     if (value >= top10Value) return null;
-
     return `${type === "add" ? "Add" : "Increase"} ${(top10Value - value).toFixed(
       2
     )} to join top 10%`;
@@ -144,8 +141,14 @@ export default function TroveScanner({ allTroves, lenderDeposits }) {
         <>
           <h3 style={{ marginTop: 20, color: "#4ade80" }}>Borrower Troves</h3>
           {borrowerResults.map((t, i) => {
-            const percentile = getPercentileRank(t.collateral_ratio, borrowerStats[t.collateralType] || []);
-            const rec = recommendation(t.collateral_ratio, borrowerStats[t.collateralType] || []);
+            const percentile = getPercentileRank(
+              Number(t.collateral_ratio),
+              borrowerStats[t.collateralType] || []
+            );
+            const rec = recommendation(
+              Number(t.collateral_ratio),
+              borrowerStats[t.collateralType] || []
+            );
             return (
               <div
                 key={i}
@@ -161,8 +164,8 @@ export default function TroveScanner({ allTroves, lenderDeposits }) {
               >
                 <RankCircle percent={percentile} />
                 <div style={{ flex: 1 }}>
-                  <strong>{t.collateral_type}</strong>
-                  <p>Collateral: {Number(t.collateral_eth).toLocaleString()} ETH</p>
+                  <strong>{t.collateralType}</strong>
+                  <p>Collateral: {Number(t.collateral).toLocaleString()} ETH</p>
                   <p>Debt: {Number(t.bold_debt).toLocaleString()} BOLD</p>
                   <p>CR: {(Number(t.collateral_ratio) * 100).toFixed(2)}%</p>
                   <p>Interest Rate: {t.interest_rate}%</p>
@@ -184,7 +187,11 @@ export default function TroveScanner({ allTroves, lenderDeposits }) {
               Number(d.deposit_amount),
               lenderStats[d.collateral_type] || []
             );
-            const rec = recommendation(Number(d.deposit_amount), lenderStats[d.collateral_type] || [], "increase");
+            const rec = recommendation(
+              Number(d.deposit_amount),
+              lenderStats[d.collateral_type] || [],
+              "increase"
+            );
             return (
               <div
                 key={i}
