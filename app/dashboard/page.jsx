@@ -49,18 +49,26 @@ export default async function DashboardPage() {
   const liquidations = {};
   const apyValues = {};
 
-  // --- deposits (UNCHANGED, already works) ---
+  // --- deposits (UNCHANGED, WORKING) ---
   for (const [k, v] of Object.entries(depositsRaw)) {
     const key = normalizeCollateral(k);
     deposits[key] = (deposits[key] || 0) + Number(v || 0);
   }
 
-  // ✅ FIX: liquidations come as ROWS, not object
+  // ✅ FIXED: liquidations come as ROWS, rebuild old object format
   if (Array.isArray(liquidationsRaw)) {
     for (const row of liquidationsRaw) {
       const key = normalizeCollateral(row.collateral_type);
-      const amount = Math.abs(Number(row.liquidation_usd || 0));
-      liquidations[key] = (liquidations[key] || 0) + amount;
+
+      const usd = Number(
+        row.liquidated_usd ??
+        row.liquidation_usd ??
+        row.usd ??
+        row.amount_usd ??
+        0
+      );
+
+      liquidations[key] = (liquidations[key] || 0) + Math.abs(usd);
     }
   }
 
@@ -108,7 +116,7 @@ export default async function DashboardPage() {
     return {
       name: c,
       deposit: deposits[c] || 0,
-      liquidationUSD: liquidations[c] || 0, // ✅ now works
+      liquidationUSD: liquidations[c] || 0, // ✅ NOW WORKS
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
       crRisk: troves.length
@@ -143,35 +151,69 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <header style={{ position: "sticky", top: 0, background: "#0b1220", zIndex: 1000, padding: "12px 24px", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center" }}>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          background: "#0b1220",
+          zIndex: 1000,
+          padding: "12px 24px",
+          borderBottom: "1px solid #1f2937",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
         <a href="/dashboard">
           <Image src="/Logo.png" alt="LPMS" width={26} height={26} />
         </a>
-        <h1 style={{ color: "#fff", marginLeft: 12 }}>LPMS Dashboard</h1>
+        <h1 style={{ color: "#fff", marginLeft: 12 }}>
+          LPMS Dashboard
+        </h1>
       </header>
 
       <main style={{ padding: 32, maxWidth: 1200, margin: "0 auto" }}>
-        <p style={{ color: "#6b7280", fontSize: 12 }}>Last updated: {lastUpdated}</p>
+        <p style={{ color: "#6b7280", fontSize: 12 }}>
+          Last updated: {lastUpdated}
+        </p>
 
         <p style={{ color: "#9ca3af", marginTop: 14 }}>
           🔥 <strong>Recommended Stability Pool:</strong>{" "}
           <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
+        {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16,
+              marginTop: 16,
+            }}
+          >
             {data.map((item) => (
-              <PoolCard key={item.name} {...item} isTop={item.name === topCollateral} />
+              <PoolCard
+                key={item.name}
+                {...item}
+                isTop={item.name === topCollateral}
+              />
             ))}
           </div>
         </section>
 
+        {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#4ade80" }}>Position Scanner (Borrow & Lend)</h2>
-          <TroveScanner allTroves={allTroves} lenderDeposits={lenderDeposits} />
+          <h2 style={{ color: "#4ade80" }}>
+            Position Scanner (Borrow & Lend)
+          </h2>
+          <TroveScanner
+            allTroves={allTroves}
+            lenderDeposits={lenderDeposits}
+          />
         </section>
 
+        {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>Recent Liquidations</h2>
           <RecentLiquidationsTable rows={recentLiquidations} />
