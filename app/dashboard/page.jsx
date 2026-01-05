@@ -33,7 +33,7 @@ const MIN_CR_STRESS = {
 
 export default async function DashboardPage() {
   // ===== Fetch data =====
-  const depositsRaw = (await fetchBoldDeposit()) || {};
+  const depositsRaw = (await fetchBoldDeposit()) || [];
   const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
   const allTrovesRaw = (await fetchAllTroves()) || [];
@@ -185,9 +185,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* TROVE SCANNER */}
+        {/* TROVE + LENDER SCANNER */}
         <section style={{ marginTop: 48 }}>
-          <TroveScanner allTroves={allTroves} />
+          <TroveScanner allTroves={allTroves} lenderDeposits={depositsRaw} />
         </section>
 
         {/* RECENT LIQUIDATIONS */}
@@ -195,7 +195,6 @@ export default async function DashboardPage() {
           <h2 style={{ color: "#9ca3af" }}>
             Recent Liquidations (All)
           </h2>
-
           <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
 
