@@ -2,60 +2,92 @@
 
 import { useState } from "react";
 
-/**
- * Static APY placeholders
- * (later replace with live adapters)
- */
-const PROTOCOL_APY = {
-  Liquity: {
-    borrow: 0.035,
-  },
-  Aave: {
-    borrow: 0.041,
-  },
-  Compound: {
-    borrow: 0.044,
-  },
-  Spark: {
-    borrow: 0.038,
-  },
-};
+// Utility: compute top % ranking
+function getPercentileRank(value, allValues) {
+  if (!allValues.length) return 0;
+  const sorted = [...allValues].sort((a, b) => b - a);
+  const rank = sorted.findIndex((v) => value >= v);
+  return rank === -1 ? 100 : Math.round(((rank + 1) / sorted.length) * 100);
+}
 
-export default function TroveScanner({ allTroves }) {
+export default function TroveScanner({ allTroves, lenderDeposits }) {
   const [address, setAddress] = useState("");
-  const [results, setResults] = useState([]);
+  const [borrowerResults, setBorrowerResults] = useState([]);
+  const [lenderResults, setLenderResults] = useState([]);
 
   function scan() {
-    if (!address || !allTroves?.length) {
-      setResults([]);
+    if (!address) {
+      setBorrowerResults([]);
+      setLenderResults([]);
       return;
     }
 
     const normalizedInput = address.toLowerCase().trim();
 
-    const userTroves = allTroves.filter((trove) => {
-      if (!trove.owner_full) return false;
-      return trove.owner_full.toLowerCase() === normalizedInput;
-    });
+    // Borrowers
+    const matches = allTroves.filter(
+      (t) => t.owner_full?.toLowerCase() === normalizedInput
+    );
+    setBorrowerResults(matches);
 
-    const enriched = userTroves.map((trove) => {
-      const liquityBorrow = PROTOCOL_APY.Liquity.borrow;
+    // Lenders
+    const lenderMatches = lenderDeposits.filter(
+      (d) => d.owner?.toLowerCase() === normalizedInput
+    );
+    setLenderResults(lenderMatches);
+  }
 
-      const comparisons = Object.entries(PROTOCOL_APY).map(
-        ([protocol, rates]) => ({
-          protocol,
-          borrow: rates.borrow,
-          diff: rates.borrow - liquityBorrow,
-        })
-      );
+  // Precompute rankings for borrowers and lenders
+  const collateralTypes = ["wstETH", "WETH", "rETH"];
+  const borrowerStats = {};
+  const lenderStats = {};
 
-      return {
-        ...trove,
-        comparisons,
-      };
-    });
+  collateralTypes.forEach((c) => {
+    const borrowerTroves = allTroves
+      .filter((t) => t.collateralType === c)
+      .map((t) => t.collateral_ratio);
+    borrowerStats[c] = borrowerTroves;
 
-    setResults(enriched);
+    const lenderAmounts = lenderDeposits
+      .filter((d) => d.collateral_type === c)
+      .map((d) => Number(d.deposit_amount));
+    lenderStats[c] = lenderAmounts;
+  });
+
+  // Helper to get top 10% recommendation
+  function recommendation(value, allValues, type = "add") {
+    if (!allValues.length) return null;
+    const top10Index = Math.floor(allValues.length * 0.1);
+    const sorted = [...allValues].sort((a, b) => b - a);
+    const top10Value = sorted[top10Index] || sorted[0];
+    if (value >= top10Value) return null;
+
+    return `${type === "add" ? "Add" : "Increase"} ${(top10Value - value).toFixed(
+      2
+    )} to join top 10%`;
+  }
+
+  // Circular rank component
+  function RankCircle({ percent }) {
+    return (
+      <div
+        style={{
+          width: 50,
+          height: 50,
+          borderRadius: "50%",
+          border: "3px solid #4ade80",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontSize: 12,
+          fontWeight: "bold",
+          marginRight: 8,
+        }}
+      >
+        {percent}%
+      </div>
+    );
   }
 
   return (
@@ -67,7 +99,7 @@ export default function TroveScanner({ allTroves }) {
         borderRadius: "12px",
       }}
     >
-      <h2 style={{ color: "#4ade80" }}>🔍 Trove Scanner</h2>
+      <h2>🔍 Position Scanner (Borrow & Lend)</h2>
 
       <input
         value={address}
@@ -96,96 +128,88 @@ export default function TroveScanner({ allTroves }) {
           cursor: "pointer",
         }}
       >
-        Scan Troves
+        Scan Positions
       </button>
 
       {address && (
         <p style={{ marginTop: "12px", color: "#9ca3af" }}>
-          {results.length === 0
-            ? "No troves found for this wallet"
-            : `Found ${results.length} trove(s)`}
+          {borrowerResults.length + lenderResults.length === 0
+            ? "No positions found for this wallet"
+            : `Found ${borrowerResults.length} borrower trove(s) & ${lenderResults.length} lender deposit(s)`}
         </p>
       )}
 
-      {results.map((t, i) => (
-        <div
-          key={i}
-          style={{
-            marginTop: "16px",
-            padding: "14px",
-            borderRadius: "10px",
-            background: "#020617",
-            border: "1px solid #1f2937",
-          }}
-        >
-          <strong style={{ color: "#e5e7eb" }}>
-            {t.collateral_type}
-          </strong>
-
-          <p style={{ color: "#9ca3af" }}>
-            Collateral:{" "}
-            {Number(t.collateral_eth).toLocaleString()} ETH
-          </p>
-
-          <p style={{ color: "#9ca3af" }}>
-            Debt: {Number(t.bold_debt).toLocaleString()} BOLD
-          </p>
-
-          <p style={{ color: "#9ca3af" }}>
-            CR: {(Number(t.collateral_ratio) * 100).toFixed(2)}%
-          </p>
-
-          <p style={{ color: "#9ca3af" }}>
-            Interest Rate: {t.interest_rate}%
-          </p>
-
-          <p style={{ color: "#9ca3af" }}>
-            Trove Age: {t.trove_age} days
-          </p>
-
-          {/* PROTOCOL COMPARISON */}
-          <div style={{ marginTop: 14 }}>
-            <p
-              style={{
-                color: "#9ca3af",
-                fontSize: 13,
-                marginBottom: 6,
-              }}
-            >
-              Borrow Cost Comparison
-            </p>
-
-            {t.comparisons.map((c) => (
+      {/* Borrowers */}
+      {borrowerResults.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 20, color: "#4ade80" }}>Borrower Troves</h3>
+          {borrowerResults.map((t, i) => {
+            const percentile = getPercentileRank(t.collateral_ratio, borrowerStats[t.collateralType] || []);
+            const rec = recommendation(t.collateral_ratio, borrowerStats[t.collateralType] || []);
+            return (
               <div
-                key={c.protocol}
+                key={i}
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 13,
-                  marginTop: 4,
-                  color:
-                    c.protocol === "Liquity"
-                      ? "#4ade80"
-                      : c.diff < 0
-                      ? "#22c55e"
-                      : "#f87171",
+                  alignItems: "center",
+                  marginTop: "16px",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  background: "#020617",
+                  border: "1px solid #1f2937",
                 }}
               >
-                <span>{c.protocol}</span>
-                <span>
-                  {(c.borrow * 100).toFixed(2)}%
-                  {c.protocol !== "Liquity" && (
-                    <span style={{ marginLeft: 6 }}>
-                      ({c.diff > 0 ? "+" : ""}
-                      {(c.diff * 100).toFixed(2)}%)
-                    </span>
-                  )}
-                </span>
+                <RankCircle percent={percentile} />
+                <div style={{ flex: 1 }}>
+                  <strong>{t.collateral_type}</strong>
+                  <p>Collateral: {Number(t.collateral_eth).toLocaleString()} ETH</p>
+                  <p>Debt: {Number(t.bold_debt).toLocaleString()} BOLD</p>
+                  <p>CR: {(Number(t.collateral_ratio) * 100).toFixed(2)}%</p>
+                  <p>Interest Rate: {t.interest_rate}%</p>
+                  <p>Trove Age: {t.trove_age} days</p>
+                  {rec && <p style={{ color: "#3b82f6" }}>{rec}</p>}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+            );
+          })}
+        </>
+      )}
+
+      {/* Lenders */}
+      {lenderResults.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 20, color: "#3b82f6" }}>Lender Deposits</h3>
+          {lenderResults.map((d, i) => {
+            const percentile = getPercentileRank(
+              Number(d.deposit_amount),
+              lenderStats[d.collateral_type] || []
+            );
+            const rec = recommendation(Number(d.deposit_amount), lenderStats[d.collateral_type] || [], "increase");
+            return (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginTop: "16px",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  background: "#020617",
+                  border: "1px solid #1f2937",
+                }}
+              >
+                <RankCircle percent={percentile} />
+                <div style={{ flex: 1 }}>
+                  <strong>{d.collateral_type}</strong>
+                  <p>Deposit: {Number(d.deposit_amount).toLocaleString()} USD</p>
+                  {d.earnings && <p>Rewards Claimed: {Number(d.earnings).toLocaleString()} USD</p>}
+                  {rec && <p style={{ color: "#4ade80" }}>{rec}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }
