@@ -14,26 +14,14 @@ import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations"
 // Normalize ETH → WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
-// Enforced PoolCard order
+// Pool order and CR thresholds
 const POOLCARD_ORDER = ["wstETH", "WETH", "rETH"];
-
-// CR thresholds for risk summary
-const CR_RISK_THRESHOLD = {
-  WETH: 1.5,
-  wstETH: 1.6,
-  rETH: 1.6,
-};
-
-// Min CR for stress bar
-const MIN_CR_STRESS = {
-  WETH: 1.1,
-  wstETH: 1.2,
-  rETH: 1.2,
-};
+const CR_RISK_THRESHOLD = { WETH: 1.5, wstETH: 1.6, rETH: 1.6 };
+const MIN_CR_STRESS = { WETH: 1.1, wstETH: 1.2, rETH: 1.2 };
 
 export default async function DashboardPage() {
   // ===== Fetch data =====
-  const depositsRaw = (await fetchBoldDeposit()) || [];
+  const depositsRaw = (await fetchBoldDeposit()) || {};
   const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
   const allTrovesRaw = (await fetchAllTroves()) || [];
@@ -63,31 +51,29 @@ export default async function DashboardPage() {
   }
 
   // ===== Normalize troves =====
-  const allTroves = allTrovesRaw.map((t) => ({
-    ...t,
-    collateralType: normalizeCollateral(t.collateral_type),
-    collateral_ratio: t.collateral_ratio,
-    collateral: t.collateral,
-  }));
+  const allTroves = Array.isArray(allTrovesRaw)
+    ? allTrovesRaw.map((t) => ({
+        ...t,
+        collateralType: normalizeCollateral(t.collateral_type),
+        collateral_ratio: t.collateral_ratio,
+        collateral: t.collateral,
+      }))
+    : [];
 
-  // ===== Compute total collateral per pool =====
+  // ===== Total collateral per pool =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
       .filter((t) => t.collateralType === c)
       .reduce((sum, t) => sum + t.collateral, 0);
   });
-
   const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
   // ===== Build PoolCard data =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
-    const crRiskThreshold = CR_RISK_THRESHOLD[c];
-    const minCRStress = MIN_CR_STRESS[c];
-
     const crRiskTroves = troves.filter(
-      (t) => t.collateral_ratio <= crRiskThreshold
+      (t) => t.collateral_ratio <= CR_RISK_THRESHOLD[c]
     );
 
     return {
@@ -96,31 +82,25 @@ export default async function DashboardPage() {
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
-      crRisk: troves.length
-        ? (crRiskTroves.length / troves.length) * 100
-        : 0,
-      crRiskCollateralSum: crRiskTroves.reduce(
-        (sum, t) => sum + t.collateral,
-        0
-      ),
+      crRisk: troves.length ? (crRiskTroves.length / troves.length) * 100 : 0,
+      crRiskCollateralSum: crRiskTroves.reduce((sum, t) => sum + t.collateral, 0),
       totalCollateral: totalCollateralSum[c],
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2,
-      crRiskThreshold,
-      minCRStress,
+      crRiskThreshold: CR_RISK_THRESHOLD[c],
+      minCRStress: MIN_CR_STRESS[c],
     };
   });
 
   const topCollateral = data.reduce(
-    (best, cur) =>
-      cur.totalCollateral > best.totalCollateral ? cur : best,
+    (best, cur) => (cur.totalCollateral > best.totalCollateral ? cur : best),
     data[0]
   ).name;
 
-  // ===== Recent liquidations (ALL from Dune) =====
+  // ===== Recent liquidations =====
   const recentLiquidations = recentLiquidationsRaw.map((l) => ({
     time: l.block_time,
-    ownerHtml: l.owner, // HTML <a> tag from Dune
+    ownerHtml: l.owner,
     troveId: l.trove_id,
     collateralType: normalizeCollateral(l.collateral_type),
     collateralAmount: Math.abs(Number(l.collateral_change || 0)),
@@ -147,15 +127,11 @@ export default async function DashboardPage() {
         <a href="/dashboard">
           <Image src="/Logo.png" alt="LPMS" width={26} height={26} />
         </a>
-        <h1 style={{ color: "#fff", marginLeft: 12 }}>
-          LPMS Dashboard
-        </h1>
+        <h1 style={{ color: "#fff", marginLeft: 12 }}>LPMS Dashboard</h1>
       </header>
 
       <main style={{ padding: 32, maxWidth: 1200, margin: "0 auto" }}>
-        <p style={{ color: "#6b7280", fontSize: 12 }}>
-          Last updated: {lastUpdated}
-        </p>
+        <p style={{ color: "#6b7280", fontSize: 12 }}>Last updated: {lastUpdated}</p>
 
         <p style={{ color: "#9ca3af", marginTop: 14 }}>
           🔥 <strong>Recommended Stability Pool:</strong>{" "}
@@ -185,25 +161,22 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* TROVE + LENDER SCANNER */}
+        {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
-          <TroveScanner allTroves={allTroves} lenderDeposits={depositsRaw} />
+          <TroveScanner allTroves={allTroves} deposits={deposits} />
         </section>
 
         {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#9ca3af" }}>
-            Recent Liquidations (All)
-          </h2>
+          <h2 style={{ color: "#9ca3af" }}>Recent Liquidations (All)</h2>
           <RecentLiquidationsTable rows={recentLiquidations} />
         </section>
 
         {/* CR RANKING */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>Top 10 Collateral Ratios by Pool</h2>
-
           <div style={{ display: "flex", gap: 16 }}>
-            {["wstETH", "WETH", "rETH"].map((collateral, index) => {
+            {POOLCARD_ORDER.map((collateral, index) => {
               const topTroves = allTroves
                 .filter((t) => t.collateralType === collateral)
                 .sort((a, b) => b.collateral_ratio - a.collateral_ratio)
@@ -222,39 +195,22 @@ export default async function DashboardPage() {
                     backgroundColor: "#0b1220",
                   }}
                 >
-                  <h3 style={{ color: borderColor, marginBottom: 12 }}>
-                    {collateral}
-                  </h3>
+                  <h3 style={{ color: borderColor, marginBottom: 12 }}>{collateral}</h3>
                   {topTroves.length === 0 ? (
                     <p style={{ color: "#9ca3af" }}>No data</p>
                   ) : (
-                    <table
-                      style={{ width: "100%", color: "#fff", fontSize: 13 }}
-                    >
+                    <table style={{ width: "100%", color: "#fff", fontSize: 13 }}>
                       <thead>
                         <tr>
-                          <th
-                            style={{ textAlign: "left", paddingBottom: 8 }}
-                          >
-                            Trove ID
-                          </th>
-                          <th
-                            style={{ textAlign: "right", paddingBottom: 8 }}
-                          >
-                            CR
-                          </th>
+                          <th style={{ textAlign: "left", paddingBottom: 8 }}>Trove ID</th>
+                          <th style={{ textAlign: "right", paddingBottom: 8 }}>CR</th>
                         </tr>
                       </thead>
                       <tbody>
                         {topTroves.map((t) => (
                           <tr key={t.trove_id}>
                             <td style={{ padding: "4px 0" }}>{t.trove_id}</td>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "4px 0",
-                              }}
-                            >
+                            <td style={{ textAlign: "right", padding: "4px 0" }}>
                               {t.collateral_ratio.toFixed(2)}
                             </td>
                           </tr>
