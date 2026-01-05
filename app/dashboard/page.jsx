@@ -40,7 +40,14 @@ export default async function DashboardPage() {
   let redemptionRisksRaw = {};
   let recentLiquidationsRaw = [];
 
-  try { lenderDeposits = await fetchBoldDeposit(); } catch (e) { console.error(e); }
+  try {
+    const res = await fetchBoldDeposit();
+    lenderDeposits = Array.isArray(res) ? res : [];
+  } catch (e) {
+    console.error("fetchBoldDeposit failed:", e);
+    lenderDeposits = [];
+  }
+
   try { liquidationsRaw = await fetchLiquidations(); } catch (e) { console.error(e); }
   try { apyRaw = await fetchAverageAPY(); } catch (e) { console.error(e); }
   try { allTrovesRaw = await fetchAllTroves(); } catch (e) { console.error(e); }
@@ -49,11 +56,16 @@ export default async function DashboardPage() {
 
   const lastUpdated = new Date().toUTCString();
 
-  // ===== Aggregate deposits for PoolCards =====
+  // ===== Aggregate deposits for PoolCards (SAFE) =====
   const deposits = {};
-  for (const d of lenderDeposits) {
-    const c = normalizeCollateral(d.collateral_type);
-    deposits[c] = (deposits[c] || 0) + d.deposit_amount;
+
+  if (Array.isArray(lenderDeposits)) {
+    for (const d of lenderDeposits) {
+      if (!d?.collateral_type || !d?.deposited_bold) continue;
+
+      const c = normalizeCollateral(d.collateral_type);
+      deposits[c] = (deposits[c] || 0) + Number(d.deposited_bold || 0);
+    }
   }
 
   // ===== Normalize APY / liquidations =====
@@ -142,7 +154,6 @@ export default async function DashboardPage() {
           <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
-        {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
@@ -152,16 +163,11 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* UNIFIED SCANNER */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#4ade80" }}>Position Scanner (Borrow & Lend)</h2>
-          <TroveScanner
-            allTroves={allTroves}
-            lenderDeposits={lenderDeposits}
-          />
+          <TroveScanner allTroves={allTroves} lenderDeposits={lenderDeposits} />
         </section>
 
-        {/* RECENT LIQUIDATIONS */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>Recent Liquidations</h2>
           <RecentLiquidationsTable rows={recentLiquidations} />
