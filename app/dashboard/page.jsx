@@ -15,14 +15,17 @@ import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations"
 // Normalize ETH → WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
+// Enforced PoolCard order
 const POOLCARD_ORDER = ["wstETH", "WETH", "rETH"];
 
+// CR thresholds for risk summary
 const CR_RISK_THRESHOLD = {
   WETH: 1.5,
   wstETH: 1.6,
   rETH: 1.6,
 };
 
+// Min CR for stress bar
 const MIN_CR_STRESS = {
   WETH: 1.1,
   wstETH: 1.2,
@@ -30,10 +33,10 @@ const MIN_CR_STRESS = {
 };
 
 export default async function DashboardPage() {
-  // ===== Fetch =====
+  // ===== Fetch data =====
   const depositsRaw = (await fetchBoldDeposit()) || {};
   const lenderDepositsRaw = (await fetchLenderDeposits()) || [];
-  const liquidationsRaw = await fetchLiquidations(); // IMPORTANT
+  const liquidationsRaw = (await fetchLiquidations()) || {};
   const apyRaw = (await fetchAverageAPY()) || {};
   const allTrovesRaw = (await fetchAllTroves()) || [];
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
@@ -41,50 +44,30 @@ export default async function DashboardPage() {
 
   const lastUpdated = new Date().toUTCString();
 
-  // ===== Deposits =====
+  // ===== Normalize deposits / liquidations / APY =====
   const deposits = {};
+  const liquidations = {};
+  const apyValues = {};
+
+  // --- deposits ---
   for (const [k, v] of Object.entries(depositsRaw)) {
     const key = normalizeCollateral(k);
     deposits[key] = (deposits[key] || 0) + Number(v || 0);
   }
 
-  // ===== 🔥 LIQUIDATIONS (REAL FIX) =====
-  const liquidations = {};
-
-  // CASE 1: OLD WORKING FORMAT (OBJECT)
-  if (
-    liquidationsRaw &&
-    !Array.isArray(liquidationsRaw) &&
-    typeof liquidationsRaw === "object"
-  ) {
-    for (const [k, v] of Object.entries(liquidationsRaw)) {
-      const key = normalizeCollateral(k);
-      liquidations[key] = Number(v || 0);
-    }
+  // ✅ Liquidations: use old working logic (sum values directly from object)
+  for (const [k, v] of Object.entries(liquidationsRaw)) {
+    const key = normalizeCollateral(k);
+    liquidations[key] = (liquidations[key] || 0) + Number(v || 0);
   }
 
-  // CASE 2: ROW FORMAT (if query ever changes)
-  if (Array.isArray(liquidationsRaw)) {
-    for (const row of liquidationsRaw) {
-      const key = normalizeCollateral(row.collateral_type);
-
-      const usd =
-        Number(row.liquidation_usd) ||
-        Number(row.liquidated_usd) ||
-        Number(row.usd) ||
-        0;
-
-      liquidations[key] = (liquidations[key] || 0) + Math.abs(usd);
-    }
-  }
-
-  // ===== APY =====
-  const apyValues = {};
+  // --- APY ---
   for (const [k, v] of Object.entries(apyRaw)) {
-    apyValues[normalizeCollateral(k)] = Number(v || 0);
+    const key = normalizeCollateral(k);
+    apyValues[key] = Number(v || 0);
   }
 
-  // ===== Troves =====
+  // ===== Normalize troves =====
   const allTroves = allTrovesRaw.map((t) => ({
     ...t,
     collateralType: normalizeCollateral(t.collateral_type),
@@ -92,7 +75,7 @@ export default async function DashboardPage() {
     collateral: Number(t.collateral),
   }));
 
-  // ===== Lender deposits =====
+  // ===== Normalize lender deposits =====
   const lenderDeposits = lenderDepositsRaw.map((d) => ({
     owner: d.owner,
     collateralType: normalizeCollateral(d.collateral_type),
@@ -102,17 +85,17 @@ export default async function DashboardPage() {
     lastModified: d.last_modified,
   }));
 
-  // ===== Total collateral =====
+  // ===== Total collateral per pool =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
       .filter((t) => t.collateralType === c)
-      .reduce((s, t) => s + t.collateral, 0);
+      .reduce((sum, t) => sum + t.collateral, 0);
   });
 
   const maxCollateral = Math.max(...Object.values(totalCollateralSum), 1);
 
-  // ===== PoolCards =====
+  // ===== PoolCard data =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
     const risky = troves.filter(
@@ -122,12 +105,10 @@ export default async function DashboardPage() {
     return {
       name: c,
       deposit: deposits[c] || 0,
-      liquidationUSD: liquidations[c] || 0, // ✅ FIXED FOR REAL
+      liquidationUSD: liquidations[c] || 0, // ✅ uses old working logic
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
-      crRisk: troves.length
-        ? (risky.length / troves.length) * 100
-        : 0,
+      crRisk: troves.length ? (risky.length / troves.length) * 100 : 0,
       crRiskCollateralSum: risky.reduce((s, t) => s + t.collateral, 0),
       totalCollateral: totalCollateralSum[c],
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
@@ -138,7 +119,8 @@ export default async function DashboardPage() {
   });
 
   const topCollateral = data.reduce(
-    (a, b) => (b.totalCollateral > a.totalCollateral ? b : a),
+    (best, cur) =>
+      cur.totalCollateral > best.totalCollateral ? cur : best,
     data[0]
   ).name;
 
@@ -156,28 +138,70 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <header style={{ background: "#0b1220", padding: 16 }}>
-        <Image src="/Logo.png" alt="LPMS" width={26} height={26} />
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          background: "#0b1220",
+          zIndex: 1000,
+          padding: "12px 24px",
+          borderBottom: "1px solid #1f2937",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <a href="/dashboard">
+          <Image src="/Logo.png" alt="LPMS" width={26} height={26} />
+        </a>
+        <h1 style={{ color: "#fff", marginLeft: 12 }}>
+          LPMS Dashboard
+        </h1>
       </header>
 
       <main style={{ padding: 32, maxWidth: 1200, margin: "0 auto" }}>
-        <p style={{ color: "#6b7280" }}>Last updated: {lastUpdated}</p>
+        <p style={{ color: "#6b7280", fontSize: 12 }}>
+          Last updated: {lastUpdated}
+        </p>
 
-        <section>
-          <h2>Stability Pools</h2>
-          <div style={{ display: "grid", gap: 16 }}>
+        <p style={{ color: "#9ca3af", marginTop: 14 }}>
+          🔥 <strong>Recommended Stability Pool:</strong>{" "}
+          <span style={{ color: "#4ade80" }}>{topCollateral}</span>
+        </p>
+
+        {/* POOLS */}
+        <section style={{ marginTop: 28 }}>
+          <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16,
+              marginTop: 16,
+            }}
+          >
             {data.map((item) => (
-              <PoolCard key={item.name} {...item} />
+              <PoolCard
+                key={item.name}
+                {...item}
+                isTop={item.name === topCollateral}
+              />
             ))}
           </div>
         </section>
 
-        <TroveScanner
-          allTroves={allTroves}
-          lenderDeposits={lenderDeposits}
-        />
+        {/* TROVE SCANNER */}
+        <section style={{ marginTop: 48 }}>
+          <h2 style={{ color: "#4ade80" }}>
+            Position Scanner (Borrow & Lend)
+          </h2>
+          <TroveScanner allTroves={allTroves} lenderDeposits={lenderDeposits} />
+        </section>
 
-        <RecentLiquidationsTable rows={recentLiquidations} />
+        {/* RECENT LIQUIDATIONS */}
+        <section style={{ marginTop: 48 }}>
+          <h2 style={{ color: "#9ca3af" }}>Recent Liquidations</h2>
+          <RecentLiquidationsTable rows={recentLiquidations} />
+        </section>
       </main>
 
       <Footer />
