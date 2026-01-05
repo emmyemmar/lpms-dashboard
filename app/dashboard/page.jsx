@@ -33,48 +33,13 @@ const MIN_CR_STRESS = {
 
 export default async function DashboardPage() {
   // ===== Fetch data safely =====
-  let depositsRaw = {};
-  let liquidationsRaw = {};
-  let apyRaw = {};
-  let allTrovesRaw = [];
-  let redemptionRisksRaw = {};
-  let recentLiquidationsRaw = [];
-
-  try {
-    depositsRaw = (await fetchBoldDeposit()) || {};
-  } catch (e) {
-    console.error("Bold deposit fetch error:", e.message);
-  }
-
-  try {
-    liquidationsRaw = (await fetchLiquidations()) || {};
-  } catch (e) {
-    console.error("Liquidations fetch error:", e.message);
-  }
-
-  try {
-    apyRaw = (await fetchAverageAPY()) || {};
-  } catch (e) {
-    console.error("APY fetch error:", e.message);
-  }
-
-  try {
-    allTrovesRaw = (await fetchAllTroves()) || [];
-  } catch (e) {
-    console.error("All troves fetch error:", e.message);
-  }
-
-  try {
-    redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
-  } catch (e) {
-    console.error("Redemption risk fetch error:", e.message);
-  }
-
-  try {
-    recentLiquidationsRaw = (await fetchRecentLiquidations()) || [];
-  } catch (e) {
-    console.error("Recent liquidations fetch error:", e.message);
-  }
+  let depositsRaw = {}, liquidationsRaw = {}, apyRaw = {}, allTrovesRaw = [], redemptionRisksRaw = {}, recentLiquidationsRaw = [];
+  try { depositsRaw = (await fetchBoldDeposit()) || {}; } catch(e){ console.error("Bold deposit fetch failed:", e); }
+  try { liquidationsRaw = (await fetchLiquidations()) || {}; } catch(e){ console.error("Liquidations fetch failed:", e); }
+  try { apyRaw = (await fetchAverageAPY()) || {}; } catch(e){ console.error("APY fetch failed:", e); }
+  try { allTrovesRaw = (await fetchAllTroves()) || []; } catch(e){ console.error("All Troves fetch failed:", e); }
+  try { redemptionRisksRaw = (await fetchRedemptionRisk()) || {}; } catch(e){ console.error("Redemption risk fetch failed:", e); }
+  try { recentLiquidationsRaw = (await fetchRecentLiquidations()) || []; } catch(e){ console.error("Recent liquidations fetch failed:", e); }
 
   const lastUpdated = new Date().toUTCString();
 
@@ -83,30 +48,21 @@ export default async function DashboardPage() {
   const liquidations = {};
   const apyValues = {};
 
-  Object.entries(depositsRaw).forEach(([k, v]) => {
-    const key = normalizeCollateral(k);
-    deposits[key] = (deposits[key] || 0) + v;
-  });
-
-  Object.entries(liquidationsRaw).forEach(([k, v]) => {
-    const key = normalizeCollateral(k);
-    liquidations[key] = (liquidations[key] || 0) + v;
-  });
-
-  Object.entries(apyRaw).forEach(([k, v]) => {
-    const key = normalizeCollateral(k);
-    apyValues[key] = v;
-  });
+  for (const [k, v] of Object.entries(depositsRaw)) deposits[normalizeCollateral(k)] = (deposits[normalizeCollateral(k)] || 0) + v;
+  for (const [k, v] of Object.entries(liquidationsRaw)) liquidations[normalizeCollateral(k)] = (liquidations[normalizeCollateral(k)] || 0) + v;
+  for (const [k, v] of Object.entries(apyRaw)) apyValues[normalizeCollateral(k)] = v;
 
   // ===== Normalize troves =====
-  const allTroves = allTrovesRaw.map((t) => ({
-    ...t,
-    collateralType: normalizeCollateral(t.collateral_type),
-    collateral_ratio: t.collateral_ratio,
-    collateral: t.collateral,
-  }));
+  const allTroves = Array.isArray(allTrovesRaw)
+    ? allTrovesRaw.map((t) => ({
+        ...t,
+        collateralType: normalizeCollateral(t.collateral_type),
+        collateral_ratio: t.collateral_ratio,
+        collateral: t.collateral,
+      }))
+    : [];
 
-  // ===== Compute total collateral per pool =====
+  // ===== Total collateral per pool =====
   const totalCollateralSum = {};
   POOLCARD_ORDER.forEach((c) => {
     totalCollateralSum[c] = allTroves
@@ -119,12 +75,7 @@ export default async function DashboardPage() {
   // ===== Build PoolCard data =====
   const data = POOLCARD_ORDER.map((c) => {
     const troves = allTroves.filter((t) => t.collateralType === c);
-    const crRiskThreshold = CR_RISK_THRESHOLD[c];
-    const minCRStress = MIN_CR_STRESS[c];
-
-    const crRiskTroves = troves.filter(
-      (t) => t.collateral_ratio <= crRiskThreshold
-    );
+    const crRiskTroves = troves.filter((t) => t.collateral_ratio <= CR_RISK_THRESHOLD[c]);
 
     return {
       name: c,
@@ -132,57 +83,50 @@ export default async function DashboardPage() {
       liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
-      crRisk: troves.length
-        ? (crRiskTroves.length / troves.length) * 100
-        : 0,
-      crRiskCollateralSum: crRiskTroves.reduce(
-        (sum, t) => sum + t.collateral,
-        0
-      ),
+      crRisk: troves.length ? (crRiskTroves.length / troves.length) * 100 : 0,
+      crRiskCollateralSum: crRiskTroves.reduce((sum, t) => sum + t.collateral, 0),
       totalCollateral: totalCollateralSum[c],
       redemptionRisk: redemptionRisksRaw[c] || "Minimal",
       profitability: totalCollateralSum[c] / maxCollateral / 2,
-      crRiskThreshold,
-      minCRStress,
+      crRiskThreshold: CR_RISK_THRESHOLD[c],
+      minCRStress: MIN_CR_STRESS[c],
     };
   });
 
   const topCollateral = data.reduce(
-    (best, cur) =>
-      cur.totalCollateral > best.totalCollateral ? cur : best,
+    (best, cur) => (cur.totalCollateral > best.totalCollateral ? cur : best),
     data[0]
   ).name;
 
-  // ===== Recent liquidations (ALL from Dune) =====
-  const recentLiquidations = recentLiquidationsRaw.map((l) => ({
-    time: l.block_time,
-    ownerHtml: l.owner || "", // Safe fallback
-    troveId: l.trove_id,
-    collateralType: normalizeCollateral(l.collateral_type),
-    collateralAmount: Math.abs(Number(l.collateral_change || 0)),
-    collateralPrice: Number(l.collateral_price || 0),
-    debt: Math.abs(Number(l.debt_change || 0)),
-    txHash: l.tx_hash,
+  // ===== Recent liquidations =====
+  const recentLiquidations = Array.isArray(recentLiquidationsRaw)
+    ? recentLiquidationsRaw.map((l) => ({
+        time: l.block_time,
+        ownerHtml: l.owner,
+        troveId: l.trove_id,
+        collateralType: normalizeCollateral(l.collateral_type),
+        collateralAmount: Math.abs(Number(l.collateral_change || 0)),
+        collateralPrice: Number(l.collateral_price || 0),
+        debt: Math.abs(Number(l.debt_change || 0)),
+        txHash: l.tx_hash,
+      }))
+    : [];
+
+  // ===== Compute top users (ranking) =====
+  const topUsers = allTroves
+    .sort((a, b) => b.collateral_ratio - a.collateral_ratio)
+    .slice(0, 10);
+
+  // ===== Extract lenders from deposits =====
+  const lenders = Object.entries(depositsRaw || {}).map(([collateral, amount]) => ({
+    collateral: normalizeCollateral(collateral),
+    amount,
   }));
 
   return (
     <>
-      {/* HEADER */}
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          backgroundColor: "#0b1220",
-          zIndex: 1000,
-          padding: "12px 24px",
-          borderBottom: "1px solid #1f2937",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        <a href="/dashboard">
-          <Image src="/Logo.png" alt="LPMS" width={26} height={26} />
-        </a>
+      <header style={{ position: "sticky", top: 0, backgroundColor: "#0b1220", zIndex: 1000, padding: "12px 24px", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center" }}>
+        <a href="/dashboard"><Image src="/Logo.png" alt="LPMS" width={26} height={26} /></a>
         <h1 style={{ color: "#fff", marginLeft: 12 }}>LPMS Dashboard</h1>
       </header>
 
@@ -190,37 +134,48 @@ export default async function DashboardPage() {
         <p style={{ color: "#6b7280", fontSize: 12 }}>Last updated: {lastUpdated}</p>
 
         <p style={{ color: "#9ca3af", marginTop: 14 }}>
-          🔥 <strong>Recommended Stability Pool:</strong>{" "}
-          <span style={{ color: "#4ade80" }}>{topCollateral}</span>
+          🔥 <strong>Recommended Stability Pool:</strong> <span style={{ color: "#4ade80" }}>{topCollateral}</span>
         </p>
 
         {/* POOLS */}
         <section style={{ marginTop: 28 }}>
           <h2 style={{ color: "#4ade80" }}>Stability Pools</h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 16,
-              marginTop: 16,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
             {data.map((item) => (
-              <PoolCard
-                key={item.name}
-                {...item}
-                liquidation={item.liquidationUSD}
-                isTop={item.name === topCollateral}
-                minCRRequirement={item.minCRStress}
-              />
+              <PoolCard key={item.name} {...item} liquidation={item.liquidationUSD} isTop={item.name === topCollateral} minCRRequirement={item.minCRStress} />
             ))}
           </div>
         </section>
 
         {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#4ade80" }}>Trove & Lending Scanner</h2>
-          <TroveScanner allTroves={allTroves} deposits={deposits} apyValues={apyValues} />
+          <h2 style={{ color: "#4ade80" }}>Trove Scanner</h2>
+          <TroveScanner allTroves={allTroves} />
+        </section>
+
+        {/* LENDER SCANNER */}
+        <section style={{ marginTop: 48 }}>
+          <h2 style={{ color: "#4ade80" }}>Lender Scanner</h2>
+          {lenders.length === 0 ? (
+            <p style={{ color: "#9ca3af" }}>No lender data available</p>
+          ) : (
+            <table style={{ width: "100%", color: "#fff", fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", paddingBottom: 8 }}>Collateral</th>
+                  <th style={{ textAlign: "right", paddingBottom: 8 }}>Amount Deposited</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lenders.map((l, i) => (
+                  <tr key={i}>
+                    <td>{l.collateral}</td>
+                    <td style={{ textAlign: "right" }}>{l.amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
 
         {/* RECENT LIQUIDATIONS */}
@@ -232,7 +187,6 @@ export default async function DashboardPage() {
         {/* CR RANKING */}
         <section style={{ marginTop: 48 }}>
           <h2 style={{ color: "#9ca3af" }}>Top 10 Collateral Ratios by Pool</h2>
-
           <div style={{ display: "flex", gap: 16 }}>
             {["wstETH", "WETH", "rETH"].map((collateral, index) => {
               const topTroves = allTroves
@@ -240,19 +194,10 @@ export default async function DashboardPage() {
                 .sort((a, b) => b.collateral_ratio - a.collateral_ratio)
                 .slice(0, 10);
 
-              const borderColor = ["#3b82f6", "#4ade80", "#facc15"][index]; // blue, green, yellow
+              const borderColor = ["#3b82f6", "#4ade80", "#facc15"][index];
 
               return (
-                <div
-                  key={collateral}
-                  style={{
-                    flex: 1,
-                    border: `2px solid ${borderColor}`,
-                    borderRadius: 8,
-                    padding: 16,
-                    backgroundColor: "#0b1220",
-                  }}
-                >
+                <div key={collateral} style={{ flex: 1, border: `2px solid ${borderColor}`, borderRadius: 8, padding: 16, backgroundColor: "#0b1220" }}>
                   <h3 style={{ color: borderColor, marginBottom: 12 }}>{collateral}</h3>
                   {topTroves.length === 0 ? (
                     <p style={{ color: "#9ca3af" }}>No data</p>
@@ -267,10 +212,8 @@ export default async function DashboardPage() {
                       <tbody>
                         {topTroves.map((t) => (
                           <tr key={t.trove_id}>
-                            <td style={{ padding: "4px 0" }}>{t.trove_id}</td>
-                            <td style={{ textAlign: "right", padding: "4px 0" }}>
-                              {t.collateral_ratio.toFixed(2)}
-                            </td>
+                            <td>{t.trove_id}</td>
+                            <td style={{ textAlign: "right" }}>{t.collateral_ratio.toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
