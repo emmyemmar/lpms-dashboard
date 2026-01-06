@@ -95,8 +95,8 @@ export default function TroveScanner({
 
     return {
       protocol: "Aave",
-      deltaRate: userRate - aaveRate,
-      annualDiff: liquityAnnual - aaveAnnual,
+      deltaRate: aaveRate - userRate,
+      annualDiff: aaveAnnual - liquityAnnual,
     };
   }
 
@@ -156,7 +156,7 @@ export default function TroveScanner({
         }}
       >
         Scan Positions
-      </button>
+      </button>__
 
       {/* ---------- Receive Alerts Button ---------- */}
       <a
@@ -174,7 +174,7 @@ export default function TroveScanner({
           cursor: "pointer",
         }}
       >
-        📢 Receive Alerts
+        🔔 Receive Alerts
       </a>
 
       {/* ---------- Borrowers ---------- */}
