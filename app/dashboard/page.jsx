@@ -12,10 +12,7 @@ import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations";
 
-// ✅ DefiLlama rates
-import { fetchDefiLlamaAPY } from "../../lib/defillama/fetchLendingAPY";
-
-// ✅ Aave rates (server-only)
+// ✅ NEW: fetch Aave rates via Dune
 import { fetchAaveRates } from "../../lib/dune/fetchAaveRates";
 
 // Normalize ETH → WETH
@@ -48,8 +45,7 @@ export default async function DashboardPage() {
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
   const recentLiquidationsRaw = (await fetchRecentLiquidations()) || [];
 
-  // ===== External APY data =====
-  const defiLlamaAPY = (await fetchDefiLlamaAPY()) || {};
+  // ✅ Fetch Aave rates from Dune for borrower/lender comparison
   const aaveRates = (await fetchAaveRates()) || {};
 
   const lastUpdated = new Date().toUTCString();
@@ -201,7 +197,7 @@ export default async function DashboardPage() {
           <TroveScanner
             allTroves={allTroves}
             lenderDeposits={lenderDeposits}
-            comparisonAPY={{ ...defiLlamaAPY, ...aaveRates }}
+            comparisonAPY={aaveRates} // ✅ now uses Aave rates
           />
         </section>
 
