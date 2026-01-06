@@ -65,15 +65,11 @@ export default function TroveScanner({
     const input = address.toLowerCase().trim();
 
     setBorrowerResults(
-      allTroves.filter(
-        (t) => t.owner_full?.toLowerCase() === input
-      )
+      allTroves.filter((t) => t.owner_full?.toLowerCase() === input)
     );
 
     setLenderResults(
-      lenderDeposits.filter(
-        (d) => d.owner?.toLowerCase() === input
-      )
+      lenderDeposits.filter((d) => d.owner?.toLowerCase() === input)
     );
   }
 
@@ -97,22 +93,32 @@ export default function TroveScanner({
 
   function getBorrowComparisons(collateral, userRate) {
     if (!userRate || !comparisonAPY[collateral]) return [];
-    const pools = comparisonAPY[collateral]; // Array of { protocol, borrowAPY, supplyAPY }
 
-    return pools
-      .filter((p) => p.borrowAPY !== null)
-      .map((p) => ({ ...p, delta: userRate - p.borrowAPY }))
-      .sort((a, b) => b.delta - a.delta);
+    const pool = comparisonAPY[collateral]; // { borrowAPY, supplyAPY }
+    if (pool.borrowAPY == null) return [];
+
+    return [
+      {
+        protocol: "Aave", // ✅ protocol name
+        borrowAPY: pool.borrowAPY,
+        delta: userRate - pool.borrowAPY,
+      },
+    ];
   }
 
   function getLendComparisons(collateral, userAPY) {
     if (!comparisonAPY[collateral]) return [];
-    const pools = comparisonAPY[collateral];
 
-    return pools
-      .filter((p) => p.supplyAPY !== null)
-      .map((p) => ({ ...p, delta: p.supplyAPY - userAPY }))
-      .sort((a, b) => b.delta - a.delta);
+    const pool = comparisonAPY[collateral]; // { borrowAPY, supplyAPY }
+    if (pool.supplyAPY == null) return [];
+
+    return [
+      {
+        protocol: "Aave", // ✅ protocol name
+        supplyAPY: pool.supplyAPY,
+        delta: pool.supplyAPY - userAPY,
+      },
+    ];
   }
 
   /* ---------- Render ---------- */
