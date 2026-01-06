@@ -47,7 +47,7 @@ function RankCircle({ percent }) {
 export default function TroveScanner({
   allTroves = [],
   lenderDeposits = [],
-  comparisonAPY = {},
+  comparisonAPY = {}, // from DefiLlama
 }) {
   const [address, setAddress] = useState("");
   const [borrowerResults, setBorrowerResults] = useState([]);
@@ -90,6 +90,26 @@ export default function TroveScanner({
       .filter((d) => d.collateralType === c)
       .map((d) => Number(d.depositAmount));
   });
+
+  /* ---------- Helpers for APY comparison ---------- */
+
+  function getBestBorrowAlt(collateral, userRate) {
+    const pools = comparisonAPY[collateral] || [];
+    const cheaper = pools.filter(
+      (p) => p.borrowAPY !== null && p.borrowAPY < userRate
+    );
+    if (!cheaper.length) return null;
+
+    return cheaper.sort((a, b) => a.borrowAPY - b.borrowAPY)[0];
+  }
+
+  function getBestLendAlt(collateral, userAPY) {
+    const pools = comparisonAPY[collateral] || [];
+    const better = pools.filter((p) => p.supplyAPY > userAPY);
+    if (!better.length) return null;
+
+    return better.sort((a, b) => b.supplyAPY - a.supplyAPY)[0];
+  }
 
   /* ---------- Render ---------- */
 
@@ -153,6 +173,11 @@ export default function TroveScanner({
               "Increase CR by"
             );
 
+            const bestBorrowAlt = getBestBorrowAlt(
+              t.collateralType,
+              Number(t.interest_rate)
+            );
+
             return (
               <div
                 key={i}
@@ -172,9 +197,19 @@ export default function TroveScanner({
                   <p>Collateral: {Number(t.collateral).toLocaleString()} ETH</p>
                   <p>Debt: {Number(t.bold_debt).toLocaleString()} BOLD</p>
                   <p>CR: {(t.collateral_ratio * 100).toFixed(2)}%</p>
-                  <p>Interest Rate: {t.interest_rate}%</p>
+                  <p>Borrow Interest: {t.interest_rate}%</p>
                   <p>Trove Age: {t.trove_age} days</p>
+
                   {rec && <p style={{ color: "#3b82f6" }}>{rec}</p>}
+
+                  {bestBorrowAlt && (
+                    <p style={{ color: "#f87171" }}>
+                      ⚠️ Cheaper borrowing on{" "}
+                      <strong>{bestBorrowAlt.protocol}</strong>:{" "}
+                      {bestBorrowAlt.borrowAPY}% (
+                      save {(t.interest_rate - bestBorrowAlt.borrowAPY).toFixed(2)}%)
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -201,10 +236,11 @@ export default function TroveScanner({
               "Increase deposit by"
             );
 
-            const apyCompare = comparisonAPY[d.collateralType] || {};
-            const bestAlt = Object.entries(apyCompare).sort(
-              (a, b) => b[1] - a[1]
-            )[0];
+            const userAPY = Number(d.apy || 0);
+            const bestLendAlt = getBestLendAlt(
+              d.collateralType,
+              userAPY
+            );
 
             return (
               <div
@@ -222,22 +258,19 @@ export default function TroveScanner({
 
                 <div style={{ flex: 1 }}>
                   <strong>{d.collateralType}</strong>
-                  <p>
-                    Deposit: {Number(d.depositAmount).toLocaleString()} BOLD
-                  </p>
+                  <p>Deposit: {Number(d.depositAmount).toLocaleString()} BOLD</p>
+                  <p>Unclaimed Rewards: {Number(d.unclaimedBold).toFixed(2)} BOLD</p>
                   <p>Depositor Age: {d.depositorAge}</p>
                   <p>Last Modified: {d.lastModified}</p>
-                  <p>
-                    Unclaimed Rewards:{" "}
-                    {Number(d.unclaimedBold).toFixed(2)} BOLD
-                  </p>
 
                   {rec && <p style={{ color: "#4ade80" }}>{rec}</p>}
 
-                  {bestAlt && (
+                  {bestLendAlt && (
                     <p style={{ color: "#facc15" }}>
-                      Higher APY available on{" "}
-                      <strong>{bestAlt[0]}</strong> ({bestAlt[1]}%)
+                      💡 Higher APY on{" "}
+                      <strong>{bestLendAlt.protocol}</strong>:{" "}
+                      {bestLendAlt.supplyAPY}% (
+                      earn +{(bestLendAlt.supplyAPY - userAPY).toFixed(2)}%)
                     </p>
                   )}
                 </div>
