@@ -12,6 +12,9 @@ import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations";
 
+// ✅ ADDED
+import { fetchDefiLlamaAPY } from "../../lib/defillama/fetchLendingAPY";
+
 // Normalize ETH → WETH
 const normalizeCollateral = (c) => (c === "ETH" ? "WETH" : c);
 
@@ -42,6 +45,9 @@ export default async function DashboardPage() {
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
   const recentLiquidationsRaw = (await fetchRecentLiquidations()) || [];
 
+  // ✅ ADDED (does not affect anything else)
+  const defiLlamaAPY = (await fetchDefiLlamaAPY()) || {};
+
   const lastUpdated = new Date().toUTCString();
 
   // ===== Normalize deposits / liquidations / APY =====
@@ -49,19 +55,16 @@ export default async function DashboardPage() {
   const liquidations = {};
   const apyValues = {};
 
-  // --- deposits ---
   for (const [k, v] of Object.entries(depositsRaw)) {
     const key = normalizeCollateral(k);
     deposits[key] = (deposits[key] || 0) + Number(v || 0);
   }
 
-  // ✅ Liquidations: use old working logic (sum values directly from object)
   for (const [k, v] of Object.entries(liquidationsRaw)) {
     const key = normalizeCollateral(k);
     liquidations[key] = (liquidations[key] || 0) + Number(v || 0);
   }
 
-  // --- APY ---
   for (const [k, v] of Object.entries(apyRaw)) {
     const key = normalizeCollateral(k);
     apyValues[key] = Number(v || 0);
@@ -105,7 +108,7 @@ export default async function DashboardPage() {
     return {
       name: c,
       deposit: deposits[c] || 0,
-      liquidationUSD: liquidations[c] || 0, // ✅ uses old working logic
+      liquidationUSD: liquidations[c] || 0,
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
       crRisk: troves.length ? (risky.length / troves.length) * 100 : 0,
@@ -194,7 +197,13 @@ export default async function DashboardPage() {
           <h2 style={{ color: "#4ade80" }}>
             Position Scanner (Borrow & Lend)
           </h2>
-          <TroveScanner allTroves={allTroves} lenderDeposits={lenderDeposits} />
+
+          {/* ✅ ONLY CHANGE HERE */}
+          <TroveScanner
+            allTroves={allTroves}
+            lenderDeposits={lenderDeposits}
+            comparisonAPY={defiLlamaAPY}
+          />
         </section>
 
         {/* RECENT LIQUIDATIONS */}
