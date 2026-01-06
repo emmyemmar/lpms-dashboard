@@ -8,7 +8,9 @@ function getPercentileRank(value, allValues) {
   if (!allValues || !allValues.length) return 0;
   const sorted = [...allValues].sort((a, b) => b - a);
   const rank = sorted.findIndex((v) => value >= v);
-  return rank === -1 ? 100 : Math.round(((rank + 1) / sorted.length) * 100);
+  return rank === -1
+    ? 100
+    : Math.round(((rank + 1) / sorted.length) * 100);
 }
 
 function recommendation(value, allValues, verb = "Increase") {
@@ -47,7 +49,7 @@ function RankCircle({ percent }) {
 export default function TroveScanner({
   allTroves = [],
   lenderDeposits = [],
-  comparisonAPY = {}, // from DefiLlama
+  comparisonAPY = {}, // DefiLlama data
 }) {
   const [address, setAddress] = useState("");
   const [borrowerResults, setBorrowerResults] = useState([]);
@@ -75,7 +77,7 @@ export default function TroveScanner({
     );
   }
 
-  /* ---------- Precompute stats ---------- */
+  /* ---------- Stats ---------- */
 
   const collateralTypes = ["wstETH", "WETH", "rETH"];
   const borrowerStats = {};
@@ -91,24 +93,29 @@ export default function TroveScanner({
       .map((d) => Number(d.depositAmount));
   });
 
-  /* ---------- Helpers for APY comparison ---------- */
+  /* ---------- Comparison helpers ---------- */
 
-  function getBestBorrowAlt(collateral, userRate) {
-    const pools = comparisonAPY[collateral] || [];
-    const cheaper = pools.filter(
-      (p) => p.borrowAPY !== null && p.borrowAPY < userRate
-    );
-    if (!cheaper.length) return null;
+  function getBorrowComparisons(collateral, userRate) {
+    if (!userRate || !comparisonAPY[collateral]) return [];
 
-    return cheaper.sort((a, b) => a.borrowAPY - b.borrowAPY)[0];
+    return comparisonAPY[collateral]
+      .filter((p) => p.borrowAPY !== null)
+      .map((p) => ({
+        ...p,
+        delta: userRate - p.borrowAPY,
+      }))
+      .sort((a, b) => b.delta - a.delta);
   }
 
-  function getBestLendAlt(collateral, userAPY) {
-    const pools = comparisonAPY[collateral] || [];
-    const better = pools.filter((p) => p.supplyAPY > userAPY);
-    if (!better.length) return null;
+  function getLendComparisons(collateral, userAPY) {
+    if (!comparisonAPY[collateral]) return [];
 
-    return better.sort((a, b) => b.supplyAPY - a.supplyAPY)[0];
+    return comparisonAPY[collateral]
+      .map((p) => ({
+        ...p,
+        delta: p.supplyAPY - userAPY,
+      }))
+      .sort((a, b) => b.delta - a.delta);
   }
 
   /* ---------- Render ---------- */
@@ -173,9 +180,10 @@ export default function TroveScanner({
               "Increase CR by"
             );
 
-            const bestBorrowAlt = getBestBorrowAlt(
+            const userRate = Number(t.interest_rate || 0);
+            const borrowComparisons = getBorrowComparisons(
               t.collateralType,
-              Number(t.interest_rate)
+              userRate
             );
 
             return (
@@ -197,18 +205,28 @@ export default function TroveScanner({
                   <p>Collateral: {Number(t.collateral).toLocaleString()} ETH</p>
                   <p>Debt: {Number(t.bold_debt).toLocaleString()} BOLD</p>
                   <p>CR: {(t.collateral_ratio * 100).toFixed(2)}%</p>
-                  <p>Borrow Interest: {t.interest_rate}%</p>
-                  <p>Trove Age: {t.trove_age} days</p>
+                  <p>Borrow Interest: {userRate}%</p>
+                  <p>Trove Age: {t.trove_age}</p>
 
                   {rec && <p style={{ color: "#3b82f6" }}>{rec}</p>}
 
-                  {bestBorrowAlt && (
-                    <p style={{ color: "#f87171" }}>
-                      ⚠️ Cheaper borrowing on{" "}
-                      <strong>{bestBorrowAlt.protocol}</strong>:{" "}
-                      {bestBorrowAlt.borrowAPY}% (
-                      save {(t.interest_rate - bestBorrowAlt.borrowAPY).toFixed(2)}%)
-                    </p>
+                  {borrowComparisons.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {borrowComparisons.map((p, idx) => (
+                        <p
+                          key={idx}
+                          style={{
+                            color: p.delta > 0 ? "#f87171" : "#4ade80",
+                          }}
+                        >
+                          {p.delta > 0
+                            ? `⚠️ ${p.protocol} is cheaper by ${p.delta.toFixed(2)}%`
+                            : `✅ ${p.protocol} is ${Math.abs(p.delta).toFixed(
+                                2
+                              )}% more expensive`}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
@@ -237,7 +255,7 @@ export default function TroveScanner({
             );
 
             const userAPY = Number(d.apy || 0);
-            const bestLendAlt = getBestLendAlt(
+            const lendComparisons = getLendComparisons(
               d.collateralType,
               userAPY
             );
@@ -265,13 +283,23 @@ export default function TroveScanner({
 
                   {rec && <p style={{ color: "#4ade80" }}>{rec}</p>}
 
-                  {bestLendAlt && (
-                    <p style={{ color: "#facc15" }}>
-                      💡 Higher APY on{" "}
-                      <strong>{bestLendAlt.protocol}</strong>:{" "}
-                      {bestLendAlt.supplyAPY}% (
-                      earn +{(bestLendAlt.supplyAPY - userAPY).toFixed(2)}%)
-                    </p>
+                  {lendComparisons.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {lendComparisons.map((p, idx) => (
+                        <p
+                          key={idx}
+                          style={{
+                            color: p.delta > 0 ? "#facc15" : "#9ca3af",
+                          }}
+                        >
+                          {p.delta > 0
+                            ? `💡 ${p.protocol} earns +${p.delta.toFixed(2)}% more`
+                            : `${p.protocol} earns ${Math.abs(p.delta).toFixed(
+                                2
+                              )}% less`}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
