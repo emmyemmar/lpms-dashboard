@@ -95,8 +95,8 @@ export default function TroveScanner({
 
     return {
       protocol: "Aave",
-      deltaRate: aaveRate - userRate,
-      annualDiff: aaveAnnual - liquityAnnual,
+      deltaRate: userRate - aaveRate,
+      annualDiff: liquityAnnual - aaveAnnual,
     };
   }
 
@@ -157,6 +157,25 @@ export default function TroveScanner({
       >
         Scan Positions
       </button>
+
+      {/* ---------- Receive Alerts Button ---------- */}
+      <a
+        href="https://t.me/LiquityTrove_Alert_Bot"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "inline-block",
+          marginTop: 12,
+          padding: "10px 16px",
+          borderRadius: 8,
+          background: "#10b981",
+          color: "#fff",
+          textDecoration: "none",
+          cursor: "pointer",
+        }}
+      >
+        📢 Receive Alerts
+      </a>
 
       {/* ---------- Borrowers ---------- */}
       {borrowerResults.length > 0 && (
