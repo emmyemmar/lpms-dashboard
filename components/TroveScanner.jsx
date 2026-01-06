@@ -49,7 +49,7 @@ function RankCircle({ percent }) {
 export default function TroveScanner({
   allTroves = [],
   lenderDeposits = [],
-  comparisonAPY = {}, // DefiLlama data
+  comparisonAPY = {}, // Aave rates from Dune
 }) {
   const [address, setAddress] = useState("");
   const [borrowerResults, setBorrowerResults] = useState([]);
@@ -93,28 +93,25 @@ export default function TroveScanner({
       .map((d) => Number(d.depositAmount));
   });
 
-  /* ---------- Comparison helpers ---------- */
+  /* ---------- Comparison helpers (Aave) ---------- */
 
   function getBorrowComparisons(collateral, userRate) {
     if (!userRate || !comparisonAPY[collateral]) return [];
+    const pools = comparisonAPY[collateral]; // Array of { protocol, borrowAPY, supplyAPY }
 
-    return comparisonAPY[collateral]
+    return pools
       .filter((p) => p.borrowAPY !== null)
-      .map((p) => ({
-        ...p,
-        delta: userRate - p.borrowAPY,
-      }))
+      .map((p) => ({ ...p, delta: userRate - p.borrowAPY }))
       .sort((a, b) => b.delta - a.delta);
   }
 
   function getLendComparisons(collateral, userAPY) {
     if (!comparisonAPY[collateral]) return [];
+    const pools = comparisonAPY[collateral];
 
-    return comparisonAPY[collateral]
-      .map((p) => ({
-        ...p,
-        delta: p.supplyAPY - userAPY,
-      }))
+    return pools
+      .filter((p) => p.supplyAPY !== null)
+      .map((p) => ({ ...p, delta: p.supplyAPY - userAPY }))
       .sort((a, b) => b.delta - a.delta);
   }
 
