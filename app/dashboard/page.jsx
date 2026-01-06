@@ -12,7 +12,10 @@ import { fetchAllTroves } from "../../lib/dune/fetchAllTroves";
 import { fetchRedemptionRisk } from "../../lib/dune/fetchRedemptionRisk";
 import { fetchRecentLiquidations } from "../../lib/dune/fetchRecentLiquidations";
 
-// ✅ REPLACE DefiLlama: Fetch Aave rates from Dune
+// ✅ DefiLlama rates
+import { fetchDefiLlamaAPY } from "../../lib/defillama/fetchLendingAPY";
+
+// ✅ Aave rates (server-only)
 import { fetchAaveRates } from "../../lib/dune/fetchAaveRates";
 
 // Normalize ETH → WETH
@@ -45,12 +48,9 @@ export default async function DashboardPage() {
   const redemptionRisksRaw = (await fetchRedemptionRisk()) || {};
   const recentLiquidationsRaw = (await fetchRecentLiquidations()) || [];
 
-  // ✅ NEW: fetch Aave comparison rates
-  const aaveRates = (await fetchAaveRates()) || {
-    WETH: { borrowAPY: 0, supplyAPY: 0 },
-    wstETH: { borrowAPY: 0, supplyAPY: 0 },
-    rETH: { borrowAPY: 0, supplyAPY: 0 },
-  };
+  // ===== External APY data =====
+  const defiLlamaAPY = (await fetchDefiLlamaAPY()) || {};
+  const aaveRates = (await fetchAaveRates()) || {};
 
   const lastUpdated = new Date().toUTCString();
 
@@ -90,7 +90,6 @@ export default async function DashboardPage() {
     unclaimedBold: Number(d.unclaimed_bold || 0),
     depositorAge: d.depositor_age,
     lastModified: d.last_modified,
-    apy: Number(d.apy || 0), // existing APY
   }));
 
   // ===== Total collateral per pool =====
@@ -199,15 +198,10 @@ export default async function DashboardPage() {
 
         {/* TROVE SCANNER */}
         <section style={{ marginTop: 48 }}>
-          <h2 style={{ color: "#4ade80" }}>
-            Position Scanner (Borrow & Lend)
-          </h2>
-
-          {/* ✅ Pass Aave rates as comparisonAPY */}
           <TroveScanner
             allTroves={allTroves}
             lenderDeposits={lenderDeposits}
-            comparisonAPY={aaveRates}
+            comparisonAPY={{ ...defiLlamaAPY, ...aaveRates }}
           />
         </section>
 
