@@ -8,9 +8,7 @@ function getPercentileRank(value, allValues) {
   if (!allValues || !allValues.length) return 0;
   const sorted = [...allValues].sort((a, b) => b - a);
   const rank = sorted.findIndex((v) => value >= v);
-  return rank === -1
-    ? 100
-    : Math.round(((rank + 1) / sorted.length) * 100);
+  return rank === -1 ? 100 : Math.round(((rank + 1) / sorted.length) * 100);
 }
 
 function recommendation(value, allValues, verb = "Increase") {
@@ -49,7 +47,7 @@ function RankCircle({ percent }) {
 export default function TroveScanner({
   allTroves = [],
   lenderDeposits = [],
-  comparisonAPY = {}, // Aave rates from Dune
+  comparisonAPY = {}, // { WETH: { borrowAPY, supplyAPY }, ... }
 }) {
   const [address, setAddress] = useState("");
   const [borrowerResults, setBorrowerResults] = useState([]);
@@ -61,16 +59,9 @@ export default function TroveScanner({
       setLenderResults([]);
       return;
     }
-
     const input = address.toLowerCase().trim();
-
-    setBorrowerResults(
-      allTroves.filter((t) => t.owner_full?.toLowerCase() === input)
-    );
-
-    setLenderResults(
-      lenderDeposits.filter((d) => d.owner?.toLowerCase() === input)
-    );
+    setBorrowerResults(allTroves.filter((t) => t.owner_full?.toLowerCase() === input));
+    setLenderResults(lenderDeposits.filter((d) => d.owner?.toLowerCase() === input));
   }
 
   /* ---------- Stats ---------- */
@@ -80,43 +71,44 @@ export default function TroveScanner({
   const lenderStats = {};
 
   collateralTypes.forEach((c) => {
-    borrowerStats[c] = allTroves
-      .filter((t) => t.collateralType === c)
-      .map((t) => Number(t.collateral_ratio));
-
-    lenderStats[c] = lenderDeposits
-      .filter((d) => d.collateralType === c)
-      .map((d) => Number(d.depositAmount));
+    borrowerStats[c] = allTroves.filter((t) => t.collateralType === c).map((t) => Number(t.collateral_ratio));
+    lenderStats[c] = lenderDeposits.filter((d) => d.collateralType === c).map((d) => Number(d.depositAmount));
   });
 
   /* ---------- Comparison helpers (Aave) ---------- */
 
-  function getBorrowComparisons(collateral, userRate) {
+  function getBorrowComparisons(collateral, userRate, debtAmount) {
     if (!userRate || !comparisonAPY[collateral]) return [];
-
-    const pool = comparisonAPY[collateral]; // { borrowAPY, supplyAPY }
+    const pool = comparisonAPY[collateral];
     if (pool.borrowAPY == null) return [];
+
+    const deltaRate = pool.borrowAPY - userRate;
+    const interestDiff = (debtAmount * deltaRate) / 100;
 
     return [
       {
-        protocol: "Aave", // ✅ protocol name
+        protocol: "Aave",
         borrowAPY: pool.borrowAPY,
-        delta: userRate - pool.borrowAPY,
+        deltaRate,
+        interestDiff,
       },
     ];
   }
 
-  function getLendComparisons(collateral, userAPY) {
+  function getLendComparisons(collateral, userAPY, depositAmount) {
     if (!comparisonAPY[collateral]) return [];
-
-    const pool = comparisonAPY[collateral]; // { borrowAPY, supplyAPY }
+    const pool = comparisonAPY[collateral];
     if (pool.supplyAPY == null) return [];
+
+    const deltaRate = pool.supplyAPY - userAPY;
+    const interestDiff = (depositAmount * deltaRate) / 100;
 
     return [
       {
-        protocol: "Aave", // ✅ protocol name
+        protocol: "Aave",
         supplyAPY: pool.supplyAPY,
-        delta: pool.supplyAPY - userAPY,
+        deltaRate,
+        interestDiff,
       },
     ];
   }
@@ -124,42 +116,19 @@ export default function TroveScanner({
   /* ---------- Render ---------- */
 
   return (
-    <div
-      style={{
-        marginTop: 48,
-        padding: 24,
-        border: "1px solid #1f2937",
-        borderRadius: 12,
-      }}
-    >
+    <div style={{ marginTop: 48, padding: 24, border: "1px solid #1f2937", borderRadius: 12 }}>
       <h2>🔍 Position Scanner (Borrow & Lend)</h2>
 
       <input
         value={address}
         onChange={(e) => setAddress(e.target.value)}
         placeholder="Enter wallet address"
-        style={{
-          width: "100%",
-          padding: 10,
-          marginTop: 12,
-          borderRadius: 8,
-          background: "#020617",
-          border: "1px solid #1f2937",
-          color: "#fff",
-        }}
+        style={{ width: "100%", padding: 10, marginTop: 12, borderRadius: 8, background: "#020617", border: "1px solid #1f2937", color: "#fff" }}
       />
 
       <button
         onClick={scan}
-        style={{
-          marginTop: 12,
-          padding: "10px 16px",
-          borderRadius: 8,
-          background: "#2563eb",
-          color: "#fff",
-          border: "none",
-          cursor: "pointer",
-        }}
+        style={{ marginTop: 12, padding: "10px 16px", borderRadius: 8, background: "#2563eb", color: "#fff", border: "none", cursor: "pointer" }}
       >
         Scan Positions
       </button>
@@ -167,46 +136,25 @@ export default function TroveScanner({
       {/* ---------- Borrowers ---------- */}
       {borrowerResults.length > 0 && (
         <>
-          <h3 style={{ marginTop: 28, color: "#4ade80" }}>
-            Borrower Troves
-          </h3>
+          <h3 style={{ marginTop: 28, color: "#4ade80" }}>Borrower Troves</h3>
 
           {borrowerResults.map((t, i) => {
             const values = borrowerStats[t.collateralType] || [];
-            const percentile = getPercentileRank(
-              Number(t.collateral_ratio),
-              values
-            );
-            const rec = recommendation(
-              Number(t.collateral_ratio),
-              values,
-              "Increase CR by"
-            );
+            const percentile = getPercentileRank(Number(t.collateral_ratio), values);
+            const rec = recommendation(Number(t.collateral_ratio), values, "Increase CR by");
 
             const userRate = Number(t.interest_rate || 0);
-            const borrowComparisons = getBorrowComparisons(
-              t.collateralType,
-              userRate
-            );
+            const debtAmount = Number(t.bold_debt || 0);
+            const borrowComparisons = getBorrowComparisons(t.collateralType, userRate, debtAmount);
 
             return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  marginTop: 16,
-                  padding: 16,
-                  borderRadius: 10,
-                  background: "#020617",
-                  border: "1px solid #1f2937",
-                }}
-              >
+              <div key={i} style={{ display: "flex", marginTop: 16, padding: 16, borderRadius: 10, background: "#020617", border: "1px solid #1f2937" }}>
                 <RankCircle percent={percentile} />
 
                 <div style={{ flex: 1 }}>
                   <strong>{t.collateralType}</strong>
                   <p>Collateral: {Number(t.collateral).toLocaleString()} ETH</p>
-                  <p>Debt: {Number(t.bold_debt).toLocaleString()} BOLD</p>
+                  <p>Debt: {debtAmount.toLocaleString()} BOLD</p>
                   <p>CR: {(t.collateral_ratio * 100).toFixed(2)}%</p>
                   <p>Borrow Interest: {userRate}%</p>
                   <p>Trove Age: {t.trove_age}</p>
@@ -216,17 +164,10 @@ export default function TroveScanner({
                   {borrowComparisons.length > 0 && (
                     <div style={{ marginTop: 8 }}>
                       {borrowComparisons.map((p, idx) => (
-                        <p
-                          key={idx}
-                          style={{
-                            color: p.delta > 0 ? "#f87171" : "#4ade80",
-                          }}
-                        >
-                          {p.delta > 0
-                            ? `⚠️ ${p.protocol} is cheaper by ${p.delta.toFixed(2)}%`
-                            : `✅ ${p.protocol} is ${Math.abs(p.delta).toFixed(
-                                2
-                              )}% more expensive`}
+                        <p key={idx} style={{ color: p.deltaRate > 0 ? "#f87171" : "#4ade80" }}>
+                          {p.deltaRate > 0
+                            ? `⚠️ ${p.protocol} is cheaper: you could have saved ${p.interestDiff.toFixed(2)} BOLD`
+                            : `✅ ${p.protocol} is more expensive: you paid ${Math.abs(p.interestDiff).toFixed(2)} BOLD extra`}
                         </p>
                       ))}
                     </div>
@@ -241,45 +182,24 @@ export default function TroveScanner({
       {/* ---------- Lenders ---------- */}
       {lenderResults.length > 0 && (
         <>
-          <h3 style={{ marginTop: 28, color: "#3b82f6" }}>
-            Lender Deposits
-          </h3>
+          <h3 style={{ marginTop: 28, color: "#3b82f6" }}>Lender Deposits</h3>
 
           {lenderResults.map((d, i) => {
             const values = lenderStats[d.collateralType] || [];
-            const percentile = getPercentileRank(
-              Number(d.depositAmount),
-              values
-            );
-            const rec = recommendation(
-              Number(d.depositAmount),
-              values,
-              "Increase deposit by"
-            );
+            const percentile = getPercentileRank(Number(d.depositAmount), values);
+            const rec = recommendation(Number(d.depositAmount), values, "Increase deposit by");
 
             const userAPY = Number(d.apy || 0);
-            const lendComparisons = getLendComparisons(
-              d.collateralType,
-              userAPY
-            );
+            const depositAmount = Number(d.depositAmount || 0);
+            const lendComparisons = getLendComparisons(d.collateralType, userAPY, depositAmount);
 
             return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  marginTop: 16,
-                  padding: 16,
-                  borderRadius: 10,
-                  background: "#020617",
-                  border: "1px solid #1f2937",
-                }}
-              >
+              <div key={i} style={{ display: "flex", marginTop: 16, padding: 16, borderRadius: 10, background: "#020617", border: "1px solid #1f2937" }}>
                 <RankCircle percent={percentile} />
 
                 <div style={{ flex: 1 }}>
                   <strong>{d.collateralType}</strong>
-                  <p>Deposit: {Number(d.depositAmount).toLocaleString()} BOLD</p>
+                  <p>Deposit: {depositAmount.toLocaleString()} BOLD</p>
                   <p>Unclaimed Rewards: {Number(d.unclaimedBold).toFixed(2)} BOLD</p>
                   <p>Depositor Age: {d.depositorAge}</p>
                   <p>Last Modified: {d.lastModified}</p>
@@ -289,17 +209,10 @@ export default function TroveScanner({
                   {lendComparisons.length > 0 && (
                     <div style={{ marginTop: 8 }}>
                       {lendComparisons.map((p, idx) => (
-                        <p
-                          key={idx}
-                          style={{
-                            color: p.delta > 0 ? "#facc15" : "#9ca3af",
-                          }}
-                        >
-                          {p.delta > 0
-                            ? `💡 ${p.protocol} earns +${p.delta.toFixed(2)}% more`
-                            : `${p.protocol} earns ${Math.abs(p.delta).toFixed(
-                                2
-                              )}% less`}
+                        <p key={idx} style={{ color: p.deltaRate > 0 ? "#facc15" : "#9ca3af" }}>
+                          {p.deltaRate > 0
+                            ? `💡 ${p.protocol} would earn +${p.interestDiff.toFixed(2)} BOLD more`
+                            : `${p.protocol} would earn ${Math.abs(p.interestDiff).toFixed(2)} BOLD less`}
                         </p>
                       ))}
                     </div>
