@@ -95,8 +95,8 @@ export default function TroveScanner({
 
     return {
       protocol: "Aave",
-      deltaRate: userRate - aaveRate,
-      annualDiff: liquityAnnual - aaveAnnual,
+      deltaRate: aaveRate - userRate,
+      annualDiff: aaveAnnual - liquityAnnual,
     };
   }
 
