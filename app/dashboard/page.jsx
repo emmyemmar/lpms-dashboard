@@ -108,7 +108,7 @@ export default async function DashboardPage() {
     return {
       name: c,
       deposit: deposits[c] || 0,
-      liquidationUSD: liquidations[c] || 0,
+      liquidationUSD: liquidations[c] || 0, // ✅ Fixed liquidations
       apy: apyValues[c] || 0,
       lowCRTroves: troves,
       crRisk: troves.length ? (risky.length / troves.length) * 100 : 0,
@@ -186,6 +186,7 @@ export default async function DashboardPage() {
               <PoolCard
                 key={item.name}
                 {...item}
+                liquidation={item.liquidationUSD} // ✅ Fixed liquidations
                 isTop={item.name === topCollateral}
               />
             ))}
