@@ -126,7 +126,7 @@ export default function TroveScanner({
         borderRadius: 12,
       }}
     >
-      <h2>🔍 Position Scanner (Borrow & Lend)</h2>
+      <h2>🔍 Position Scanner (Borrow & Earn)</h2>
 
       <input
         value={address}
@@ -255,7 +255,7 @@ export default function TroveScanner({
       {lenderResults.length > 0 && (
         <>
           <h3 style={{ marginTop: 28, color: "#3b82f6" }}>
-            Lender Deposits
+            Earner Deposits
           </h3>
 
           {lenderResults.map((d, i) => {
